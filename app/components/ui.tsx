@@ -165,6 +165,78 @@ export function TimeAgo({ iso }: { iso: string | null }) {
   return <s-text color="subdued">{new Date(iso).toLocaleString()}</s-text>;
 }
 
+/** A tinted callout box for tips, safety notes and context. */
+export function Callout({
+  tone = "info",
+  icon = "info",
+  title,
+  children,
+}: {
+  tone?: Tone;
+  icon?: IconName;
+  title?: string;
+  children: ReactNode;
+}) {
+  return (
+    <s-box padding="base" borderRadius="base" borderWidth="base" background="subdued">
+      <s-stack direction="inline" gap="base" alignItems="start">
+        <s-icon type={icon} tone={tone === "neutral" ? "auto" : tone} size="small" />
+        <s-stack direction="block" gap="small-300">
+          {title ? <s-text type="strong">{title}</s-text> : null}
+          <s-text color="subdued">{children}</s-text>
+        </s-stack>
+      </s-stack>
+    </s-box>
+  );
+}
+
+/** A numbered walkthrough step with a title, body and optional link. */
+export function NumberedStep({
+  n,
+  title,
+  children,
+  action,
+  done,
+}: {
+  n: number;
+  title: string;
+  children?: ReactNode;
+  action?: { label: string; href: string };
+  done?: boolean;
+}) {
+  return (
+    <s-box padding="base" borderRadius="base" borderWidth="base" background="base">
+      <s-stack direction="inline" gap="base" alignItems="start">
+        <div
+          style={{
+            flex: "0 0 auto",
+            width: 30,
+            height: 30,
+            borderRadius: 999,
+            display: "grid",
+            placeItems: "center",
+            fontWeight: 650,
+            fontSize: 13,
+            background: done ? "rgba(0,128,96,.14)" : "rgba(0,0,0,.06)",
+          }}
+          aria-hidden
+        >
+          {done ? "✓" : n}
+        </div>
+        <s-stack direction="block" gap="small-300">
+          <s-text type="strong">{title}</s-text>
+          {children ? <s-text color="subdued">{children}</s-text> : null}
+          {action ? (
+            <div>
+              <s-link href={action.href}>{action.label}</s-link>
+            </div>
+          ) : null}
+        </s-stack>
+      </s-stack>
+    </s-box>
+  );
+}
+
 /** Section-level "N of M complete" progress bar. */
 export function ProgressMeter({ done, total }: { done: number; total: number }) {
   const pct = total === 0 ? 0 : Math.round((done / total) * 100);

@@ -5,6 +5,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop, requireSupplier } from "../services/shopContext.server";
 import { ALL_FIELDS, FIELD_LABELS, REQUIRED_FIELDS, type CanonicalField, type ColumnMappings } from "../domain/feeds/canonicalFields";
+import { Callout, StatCard, StatGrid, runStatusBadge, supplierStatusBadge } from "../components/ui";
 import prisma from "../db.server";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -68,17 +69,24 @@ export default function SupplierDetail() {
       </s-button>
 
       <s-section heading="Overview">
-        <s-stack direction="block" gap="small-300">
-          <s-text>Code: {supplier.code}</s-text>
-          <s-text>Source: {supplier.feedType === "url_csv" ? "Scheduled URL CSV" : "Manual CSV upload"}</s-text>
-          <s-text>Schedule: {supplier.schedule.replace(/_/g, " ")}</s-text>
-          <s-stack direction="inline" gap="base">
-            <s-badge tone="info">Matched {counts.matched}</s-badge>
-            <s-badge tone="warning">Unmatched {counts.unmatched}</s-badge>
-            <s-badge tone="critical">Ambiguous {counts.ambiguous}</s-badge>
-            <s-badge tone="neutral">Ignored {counts.ignored}</s-badge>
+        <s-stack direction="block" gap="base">
+          <s-stack direction="inline" gap="small-200" alignItems="center">
+            {supplierStatusBadge(supplier.status)}
+            <s-badge icon={supplier.feedType === "url_csv" ? "link" : "upload"}>
+              {supplier.feedType === "url_csv" ? "Scheduled URL CSV" : "Manual CSV upload"}
+            </s-badge>
+            <s-badge icon="clock">{supplier.schedule.replace(/_/g, " ")}</s-badge>
+            <s-text color="subdued">Code {supplier.code}</s-text>
           </s-stack>
-          <s-link href="/app/mappings">Open mapping workspace</s-link>
+          <StatGrid>
+            <StatCard label="Matched" value={counts.matched} icon="check-circle" tone="success" href={`/app/mappings?supplierId=${supplier.id}&status=matched`} />
+            <StatCard label="Unmatched" value={counts.unmatched} icon="question-circle" tone={counts.unmatched > 0 ? "caution" : "neutral"} href={`/app/mappings?supplierId=${supplier.id}&status=unmatched`} />
+            <StatCard label="Ambiguous" value={counts.ambiguous} icon="alert-triangle" tone={counts.ambiguous > 0 ? "warning" : "neutral"} href={`/app/mappings?supplierId=${supplier.id}&status=ambiguous`} />
+            <StatCard label="Ignored" value={counts.ignored} icon="minus-circle" tone="neutral" href={`/app/mappings?supplierId=${supplier.id}&status=ignored`} />
+          </StatGrid>
+          <div>
+            <s-link href={`/app/mappings?supplierId=${supplier.id}`}>Open mapping workspace</s-link>
+          </div>
         </s-stack>
       </s-section>
 
@@ -109,7 +117,11 @@ export default function SupplierDetail() {
         </s-section>
       )}
 
-      <s-section heading="Upload feed & map columns">
+      <s-section heading="Upload feed &amp; map columns">
+        <Callout tone="info" icon="lightbulb" title="Leave mapping blank to reuse the saved profile">
+          Map each canonical field to a CSV column header. Required: {REQUIRED_FIELDS.map((f) => FIELD_LABELS[f]).join(", ")}.
+          The mapping is saved per supplier after the first successful upload.
+        </Callout>
         <upload.Form
           method="post"
           action={`/app/actions/suppliers/${supplier.id}/upload`}
@@ -177,7 +189,9 @@ export default function SupplierDetail() {
 
       <s-section heading="Run history">
         {runs.length === 0 ? (
-          <s-paragraph>No runs yet.</s-paragraph>
+          <s-paragraph>
+            <s-text color="subdued">No runs yet. Upload a feed above to create one.</s-text>
+          </s-paragraph>
         ) : (
           <s-table>
             <s-table-header-row>
@@ -192,14 +206,22 @@ export default function SupplierDetail() {
             <s-table-body>
               {runs.map((r) => (
                 <s-table-row key={r.id}>
-                  <s-table-cell>{new Date(r.at).toLocaleString()}</s-table-cell>
-                  <s-table-cell>{r.trigger.replace(/_/g, " ")}</s-table-cell>
-                  <s-table-cell>{r.status.replace(/_/g, " ")}</s-table-cell>
-                  <s-table-cell>{r.rows}</s-table-cell>
-                  <s-table-cell>{r.safe}</s-table-cell>
-                  <s-table-cell>{r.blocked}</s-table-cell>
                   <s-table-cell>
-                    <s-link href={`/app/runs/${r.id}`}>Open</s-link>
+                    <s-text color="subdued">{new Date(r.at).toLocaleString()}</s-text>
+                  </s-table-cell>
+                  <s-table-cell>{r.trigger.replace(/_/g, " ")}</s-table-cell>
+                  <s-table-cell>{runStatusBadge(r.status)}</s-table-cell>
+                  <s-table-cell>{r.rows}</s-table-cell>
+                  <s-table-cell>
+                    <s-text tone={r.safe > 0 ? "success" : "auto"}>{r.safe}</s-text>
+                  </s-table-cell>
+                  <s-table-cell>
+                    <s-text tone={r.blocked > 0 ? "critical" : "auto"}>{r.blocked}</s-text>
+                  </s-table-cell>
+                  <s-table-cell>
+                    <s-link href={r.status === "ready_for_review" ? `/app/runs/${r.id}/review` : `/app/runs/${r.id}`}>
+                      {r.status === "ready_for_review" ? "Review" : "Open"}
+                    </s-link>
                   </s-table-cell>
                 </s-table-row>
               ))}

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { authenticate } from "../shopify.server";
 import { requireShop } from "../services/shopContext.server";
 import { recordAudit } from "../services/audit.server";
+import { Callout, EmptyState } from "../components/ui";
 import prisma from "../db.server";
 
 const num = z.coerce.number().finite();
@@ -94,10 +95,20 @@ export default function Rules() {
 
   return (
     <s-page heading="Pricing rules">
+      <s-section>
+        <Callout tone="info" icon="calculator" title="How rules choose a price">
+          Landed cost = supplier cost + freight + handling + duty% + other%. The recommended price is the higher of the
+          minimum-margin price and the markup price, then rounded and clamped to your min/max. Lower priority number
+          wins; a supplier-specific rule beats a shop-wide one at the same priority.
+        </Callout>
+      </s-section>
+
       <s-section heading="Active rules">
         {actionData?.error && <s-banner tone="critical">{actionData.error}</s-banner>}
         {rules.length === 0 ? (
-          <s-paragraph>No rules yet. Add one below — lower priority number wins.</s-paragraph>
+          <EmptyState icon="calculator" heading="No pricing rules yet">
+            Add a rule below. Without one, matched rows can still be previewed but have no recommended price.
+          </EmptyState>
         ) : (
           <s-table>
             <s-table-header-row>
@@ -112,12 +123,18 @@ export default function Rules() {
             <s-table-body>
               {rules.map((r) => (
                 <s-table-row key={r.id}>
-                  <s-table-cell>{r.priority}</s-table-cell>
-                  <s-table-cell>{r.name}</s-table-cell>
-                  <s-table-cell>{r.supplier}</s-table-cell>
-                  <s-table-cell>{r.minimumMarginPercent}</s-table-cell>
-                  <s-table-cell>{r.markupPercent}</s-table-cell>
-                  <s-table-cell>{r.roundingRule}</s-table-cell>
+                  <s-table-cell>
+                    <s-badge>{r.priority}</s-badge>
+                  </s-table-cell>
+                  <s-table-cell>
+                    <s-text type="strong">{r.name}</s-text>
+                  </s-table-cell>
+                  <s-table-cell>
+                    <s-badge tone={r.supplier === "All suppliers" ? "neutral" : "info"}>{r.supplier}</s-badge>
+                  </s-table-cell>
+                  <s-table-cell>{r.minimumMarginPercent}%</s-table-cell>
+                  <s-table-cell>{r.markupPercent}%</s-table-cell>
+                  <s-table-cell>{r.roundingRule.replace(/_/g, " ")}</s-table-cell>
                   <s-table-cell>
                     <Form method="post">
                       <input type="hidden" name="intent" value="delete" />

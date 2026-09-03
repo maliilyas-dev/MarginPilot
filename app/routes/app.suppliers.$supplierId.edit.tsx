@@ -79,24 +79,41 @@ export default function EditSupplier() {
   const actionData = useActionData<typeof action>();
   return (
     <s-page heading={`Edit ${supplier.name}`}>
-      <s-section>
-        {actionData?.error && <s-banner tone="critical">{actionData.error}</s-banner>}
-        <Form method="post">
-          <s-stack direction="block" gap="small-300">
+      <s-button slot="primary-action" href={`/app/suppliers/${supplier.id}`} variant="tertiary">
+        Cancel
+      </s-button>
+      {actionData?.error && (
+        <s-section>
+          <s-banner tone="critical">{actionData.error}</s-banner>
+        </s-section>
+      )}
+      <Form method="post">
+        <s-section heading="Identity">
+          <s-stack direction="block" gap="base">
             <s-text-field label="Supplier name" name="name" defaultValue={supplier.name} required />
             <s-select label="Status" name="status" value={supplier.status}>
               <s-option value="active">Active</s-option>
               <s-option value="inactive">Inactive</s-option>
             </s-select>
-            {supplier.feedType === "url_csv" && (
-              <>
-                <s-text-field label="Feed URL" name="feedUrl" defaultValue={supplier.feedUrl} />
-                <s-text-field label="HTTP Basic username (leave blank to keep)" name="basicUser" />
-                <s-password-field label="HTTP Basic password (leave blank to keep)" name="basicPass" />
-                <s-text>Credentials currently {supplier.credentialsConfigured ? "configured" : "not configured"}.</s-text>
-              </>
-            )}
-            <s-select label="CSV delimiter" name="delimiter" value={supplier.delimiter}>
+          </s-stack>
+        </s-section>
+
+        {supplier.feedType === "url_csv" && (
+          <s-section heading="Connection">
+            <s-stack direction="block" gap="base">
+              <s-text-field label="Feed URL" name="feedUrl" defaultValue={supplier.feedUrl} />
+              <s-text-field label="HTTP Basic username (leave blank to keep)" name="basicUser" />
+              <s-password-field label="HTTP Basic password (leave blank to keep)" name="basicPass" />
+              <s-badge tone={supplier.credentialsConfigured ? "success" : "neutral"} icon={supplier.credentialsConfigured ? "check-circle" : "circle"}>
+                {supplier.credentialsConfigured ? "Credentials configured" : "No credentials"}
+              </s-badge>
+            </s-stack>
+          </s-section>
+        )}
+
+        <s-section heading="CSV format">
+          <s-stack direction="block" gap="base">
+            <s-select label="Delimiter" name="delimiter" value={supplier.delimiter}>
               <s-option value="auto">Auto-detect</s-option>
               <s-option value="comma">Comma</s-option>
               <s-option value="semicolon">Semicolon</s-option>
@@ -108,6 +125,11 @@ export default function EditSupplier() {
               <s-option value="comma">Comma</s-option>
             </s-select>
             <s-text-field label="Thousands separator" name="thousandsSeparator" defaultValue={supplier.thousandsSeparator} />
+          </s-stack>
+        </s-section>
+
+        <s-section heading="Schedule &amp; matching">
+          <s-stack direction="block" gap="base">
             <s-select label="Schedule" name="schedule" value={supplier.schedule}>
               <s-option value="manual">Manual</s-option>
               <s-option value="daily">Daily</s-option>
@@ -120,8 +142,8 @@ export default function EditSupplier() {
               Save changes
             </s-button>
           </s-stack>
-        </Form>
-      </s-section>
+        </s-section>
+      </Form>
     </s-page>
   );
 }

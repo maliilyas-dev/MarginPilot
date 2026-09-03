@@ -30,6 +30,8 @@ export default function App() {
         <a href="/app/rules">Rules</a>
         <a href="/app/alerts">Alerts</a>
         <a href="/app/settings">Settings</a>
+        <a href="/app/guide">Guide me</a>
+        <a href="/app/help">Help &amp; docs</a>
       </NavMenu>
       <Outlet />
     </AppProvider>

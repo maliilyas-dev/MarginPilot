@@ -7,6 +7,7 @@ import { requireShop, markOnboarding } from "../services/shopContext.server";
 import { canAddSupplier, canUseUrlFeed, canUseSchedule } from "../services/entitlements.server";
 import { encryptCredentials } from "../services/encryption.server";
 import { recordAudit, hashIp } from "../services/audit.server";
+import { Callout } from "../components/ui";
 import prisma from "../db.server";
 
 const schema = z.object({
@@ -105,26 +106,52 @@ export default function NewSupplier() {
 
   return (
     <s-page heading="Add supplier">
-      <s-section>
-        {errors._form && <s-banner tone="critical">{errors._form.join(" ")}</s-banner>}
-        <Form method="post">
+      <s-button slot="primary-action" href="/app/suppliers" variant="tertiary">
+        Cancel
+      </s-button>
+      {errors._form && (
+        <s-section>
+          <s-banner tone="critical">{errors._form.join(" ")}</s-banner>
+        </s-section>
+      )}
+      <Form method="post">
+        <s-section heading="Identity">
           <s-stack direction="block" gap="base">
             <s-text-field label="Supplier name" name="name" required error={errors.name?.[0]} />
             <s-text-field
               label="Supplier code / short name"
               name="code"
-              details="Letters, numbers, dashes. Used to identify feeds."
+              details="Letters, numbers, dashes. Used to identify feeds and must be unique."
               required
               error={errors.code?.[0]}
             />
+          </s-stack>
+        </s-section>
+
+        <s-section heading="Feed source">
+          <s-stack direction="block" gap="base">
+            <Callout tone="info" icon="lightbulb">
+              Choose <s-text type="strong">Manual CSV</s-text> to upload files yourself, or{" "}
+              <s-text type="strong">Scheduled URL CSV</s-text> to have MarginPilot fetch from a URL on a schedule. URL
+              feeds are SSRF-protected: private networks, oversized responses and long redirects are refused.
+            </Callout>
             <s-select label="Feed type" name="feedType" value="upload_csv">
               <s-option value="upload_csv">Manual CSV upload</s-option>
               <s-option value="url_csv">Scheduled URL CSV</s-option>
             </s-select>
             <s-text-field label="Feed URL (URL sources only)" name="feedUrl" error={errors.feedUrl?.[0]} />
             <s-text-field label="HTTP Basic username (optional)" name="basicUser" />
-            <s-password-field label="HTTP Basic password (optional)" name="basicPass" />
-            <s-select label="CSV delimiter" name="delimiter" value="auto">
+            <s-password-field
+              label="HTTP Basic password (optional)"
+              name="basicPass"
+              details="Stored encrypted (AES-256-GCM). Never shown again after saving."
+            />
+          </s-stack>
+        </s-section>
+
+        <s-section heading="CSV format">
+          <s-stack direction="block" gap="base">
+            <s-select label="Delimiter" name="delimiter" value="auto">
               <s-option value="auto">Auto-detect</s-option>
               <s-option value="comma">Comma</s-option>
               <s-option value="semicolon">Semicolon</s-option>
@@ -137,6 +164,11 @@ export default function NewSupplier() {
             </s-select>
             <s-text-field label="Thousands separator (optional)" name="thousandsSeparator" />
             <s-text-field label="Currency code" name="currencyCode" details="Display only in Release 1" />
+          </s-stack>
+        </s-section>
+
+        <s-section heading="Schedule &amp; location">
+          <s-stack direction="block" gap="base">
             <s-select label="Schedule" name="schedule" value="manual" error={errors.schedule?.[0]}>
               <s-option value="manual">Manual</s-option>
               <s-option value="daily">Daily</s-option>
@@ -152,13 +184,18 @@ export default function NewSupplier() {
                 </s-option>
               ))}
             </s-select>
-            <s-checkbox name="barcodeMatching" value="on" label="Also match by barcode when SKU does not match" />
+          </s-stack>
+        </s-section>
+
+        <s-section heading="Matching">
+          <s-stack direction="block" gap="base">
+            <s-checkbox name="barcodeMatching" value="on" label="Also match by barcode when the SKU does not match" />
             <s-button type="submit" variant="primary">
               Create supplier
             </s-button>
           </s-stack>
-        </Form>
-      </s-section>
+        </s-section>
+      </Form>
     </s-page>
   );
 }

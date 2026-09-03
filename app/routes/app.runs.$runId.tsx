@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop, requireFeedRun } from "../services/shopContext.server";
+import { StatCard, StatGrid, runStatusBadge } from "../components/ui";
 import prisma from "../db.server";
 
 const ACTIVE = ["queued", "fetching", "parsing", "validating", "mapping", "calculating", "applying"];
@@ -75,55 +76,68 @@ export default function RunDetail() {
         </s-button>
       )}
       <s-section heading="Status">
-        <s-stack direction="block" gap="small-300">
-          <s-badge tone={run.status === "completed" ? "success" : run.status === "failed" ? "critical" : "info"}>
-            {run.status.replace(/_/g, " ")}
-          </s-badge>
-          <s-text>Started {new Date(run.at).toLocaleString()}</s-text>
-          {run.completedAt && <s-text>Finished {new Date(run.completedAt).toLocaleString()}</s-text>}
+        <s-stack direction="block" gap="base">
+          <s-stack direction="inline" gap="base" alignItems="center">
+            {runStatusBadge(run.status)}
+            {isActive ? <s-spinner size="base" /> : null}
+          </s-stack>
+          <s-text color="subdued">
+            Started {new Date(run.at).toLocaleString()}
+            {run.completedAt ? ` · finished ${new Date(run.completedAt).toLocaleString()}` : ""}
+          </s-text>
           {run.errorSummary && <s-banner tone="critical">{run.errorSummary}</s-banner>}
-          <s-link href={`/app/resources/runs/${run.id}/export`} download="">
-            Export rows (CSV)
-          </s-link>
+          <div>
+            <s-link href={`/app/resources/runs/${run.id}/export`} download="">
+              Export rows (CSV)
+            </s-link>
+          </div>
         </s-stack>
       </s-section>
 
       <s-section heading="Import results">
-        <s-stack direction="inline" gap="base">
-          <s-text>Rows {run.counts.rows}</s-text>
-          <s-text>Valid {run.counts.valid}</s-text>
-          <s-text>Invalid {run.counts.invalid}</s-text>
-          <s-text>Matched {run.counts.matched}</s-text>
-          <s-text>Unmatched {run.counts.unmatched}</s-text>
-          <s-text>Ambiguous {run.counts.ambiguous}</s-text>
-        </s-stack>
-        <s-stack direction="inline" gap="base">
-          <s-badge tone="success">Safe {run.counts.safe}</s-badge>
-          <s-badge tone="warning">Warnings {run.counts.warning}</s-badge>
-          <s-badge tone="critical">Blocked {run.counts.blocked}</s-badge>
-        </s-stack>
+        <StatGrid>
+          <StatCard label="Rows" value={run.counts.rows} icon="list-bulleted" />
+          <StatCard label="Valid" value={run.counts.valid} icon="check-circle" tone="success" />
+          <StatCard label="Invalid" value={run.counts.invalid} icon="x-circle" tone={run.counts.invalid > 0 ? "critical" : "neutral"} />
+          <StatCard label="Matched" value={run.counts.matched} icon="connect" tone="info" />
+          <StatCard label="Unmatched" value={run.counts.unmatched} icon="question-circle" tone={run.counts.unmatched > 0 ? "caution" : "neutral"} />
+          <StatCard label="Ambiguous" value={run.counts.ambiguous} icon="alert-triangle" tone={run.counts.ambiguous > 0 ? "warning" : "neutral"} />
+          <StatCard label="Safe changes" value={run.counts.safe} icon="check-circle" tone="success" />
+          <StatCard label="Warnings" value={run.counts.warning} icon="alert-triangle" tone={run.counts.warning > 0 ? "warning" : "neutral"} />
+          <StatCard label="Blocked" value={run.counts.blocked} icon="lock" tone={run.counts.blocked > 0 ? "critical" : "neutral"} />
+        </StatGrid>
       </s-section>
 
       {changeSet && (
         <s-section heading="Apply results">
-          <s-text>Change set: {changeSet.status.replace(/_/g, " ")}</s-text>
-          <s-stack direction="inline" gap="base">
-            {Object.entries(changeSet.items).map(([k, v]) => (
-              <s-text key={k}>
-                {k}: {v as number}
-              </s-text>
-            ))}
-          </s-stack>
-          {failedItems.length > 0 && (
-            <s-stack direction="block" gap="small-300">
-              <s-heading>Failed items</s-heading>
-              {failedItems.map((f) => (
-                <s-text key={f.id}>
-                  {f.variant}: {f.error}
-                </s-text>
+          <s-stack direction="block" gap="base">
+            <s-stack direction="inline" gap="base" alignItems="center">
+              <s-text type="strong">Change set</s-text>
+              {runStatusBadge(changeSet.status)}
+            </s-stack>
+            <s-stack direction="inline" gap="small-200">
+              {Object.entries(changeSet.items).map(([k, v]) => (
+                <s-badge
+                  key={k}
+                  tone={k === "succeeded" ? "success" : k === "failed" ? "critical" : "neutral"}
+                >
+                  {k}: {v as number}
+                </s-badge>
               ))}
             </s-stack>
-          )}
+            {failedItems.length > 0 && (
+              <s-box padding="base" borderRadius="base" borderWidth="base" background="base">
+                <s-stack direction="block" gap="small-300">
+                  <s-text type="strong">Failed items</s-text>
+                  {failedItems.map((f) => (
+                    <s-text key={f.id} color="subdued">
+                      {f.variant}: {f.error}
+                    </s-text>
+                  ))}
+                </s-stack>
+              </s-box>
+            )}
+          </s-stack>
         </s-section>
       )}
     </s-page>

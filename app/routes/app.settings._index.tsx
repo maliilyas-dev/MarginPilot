@@ -5,6 +5,7 @@ import { z } from "zod";
 import { authenticate } from "../shopify.server";
 import { requireShop, markOnboarding } from "../services/shopContext.server";
 import { recordAudit } from "../services/audit.server";
+import { Callout, StatCard, StatGrid } from "../components/ui";
 import prisma from "../db.server";
 
 const schema = z.object({
@@ -86,11 +87,17 @@ export default function Settings() {
   return (
     <s-page heading="Settings">
       <s-section heading="Shopify catalog">
-        <s-stack direction="block" gap="small-300">
-          <s-text>Active variants imported: {variantCount}</s-text>
-          <s-text>
-            {lastSync ? `Last sync ${lastSync.status} at ${new Date(lastSync.at).toLocaleString()} (${lastSync.variantCount} variants)` : "Not synced yet."}
-          </s-text>
+        <s-stack direction="block" gap="base">
+          <StatGrid>
+            <StatCard label="Active variants imported" value={variantCount.toLocaleString()} icon="product" tone="info" />
+            <StatCard
+              label="Last sync"
+              value={lastSync ? lastSync.status : "Never"}
+              icon="refresh"
+              tone={lastSync?.status === "completed" ? "success" : "neutral"}
+              caption={lastSync ? new Date(lastSync.at).toLocaleString() : "Run a sync to get started"}
+            />
+          </StatGrid>
           <sync.Form method="post" action="/app/actions/catalog-sync">
             <s-button type="submit" variant="primary" {...(sync.state !== "idle" ? { loading: true } : {})}>
               Sync catalog now
@@ -119,6 +126,10 @@ export default function Settings() {
       </s-section>
 
       <s-section heading="Safety policy">
+        <Callout tone="warning" icon="shield-check-mark" title="These thresholds block dangerous changes">
+          A row that exceeds any limit is marked <s-text type="strong">blocked</s-text> and cannot be applied until you
+          fix the data or override that single row. Run-level limits can stop a whole feed.
+        </Callout>
         <Form method="post">
           <input type="hidden" name="intent" value="safety" />
           <s-stack direction="block" gap="small-300">

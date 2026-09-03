@@ -5,6 +5,7 @@ import { z } from "zod";
 import { authenticate } from "../shopify.server";
 import { requireShop, requireSupplier } from "../services/shopContext.server";
 import { recordAudit } from "../services/audit.server";
+import { Callout, EmptyState } from "../components/ui";
 import prisma from "../db.server";
 
 const STATUSES = ["matched", "unmatched", "ambiguous", "ignored"] as const;
@@ -145,20 +146,38 @@ export default function Mappings() {
               </s-option>
             ))}
           </s-select>
-          <s-stack direction="inline" gap="base">
+          <s-stack direction="inline" gap="small-200">
+            <s-button
+              href={`/app/mappings${data.supplierId ? `?supplierId=${data.supplierId}` : ""}`}
+              variant={!data.status ? "primary" : "tertiary"}
+            >
+              All
+            </s-button>
             {STATUSES.map((st) => (
-              <s-link key={st} href={`/app/mappings?${data.supplierId ? `supplierId=${data.supplierId}&` : ""}status=${st}`}>
+              <s-button
+                key={st}
+                href={`/app/mappings?${data.supplierId ? `supplierId=${data.supplierId}&` : ""}status=${st}`}
+                variant={data.status === st ? "primary" : "tertiary"}
+              >
                 {st}
-              </s-link>
+              </s-button>
             ))}
-            <s-link href={`/app/mappings${data.supplierId ? `?supplierId=${data.supplierId}` : ""}`}>all</s-link>
           </s-stack>
         </s-stack>
       </s-section>
 
       <s-section>
+        <Callout tone="info" icon="connect" title="Only matched rows get applied">
+          Exact SKU matches happen automatically during a run. Unmatched and ambiguous rows land here for a manual pick —
+          MarginPilot never matches on product title. Choices persist for future runs.
+        </Callout>
+      </s-section>
+
+      <s-section>
         {data.mappings.length === 0 ? (
-          <s-paragraph>No mappings for this filter. Run a feed to generate mapping rows.</s-paragraph>
+          <EmptyState icon="connect" heading="Nothing for this filter">
+            Run a feed for a supplier to generate mapping rows, then come back here to resolve anything unmatched.
+          </EmptyState>
         ) : (
           <s-table>
             <s-table-header-row>
@@ -171,11 +190,24 @@ export default function Mappings() {
             <s-table-body>
               {data.mappings.map((m) => (
                 <s-table-row key={m.id}>
-                  <s-table-cell>{m.supplier}</s-table-cell>
-                  <s-table-cell>{m.sku}</s-table-cell>
-                  <s-table-cell>{m.variant ?? "—"}</s-table-cell>
+                  <s-table-cell>
+                    <s-text color="subdued">{m.supplier}</s-text>
+                  </s-table-cell>
+                  <s-table-cell>
+                    <s-text type="strong">{m.sku}</s-text>
+                  </s-table-cell>
+                  <s-table-cell>{m.variant ?? <s-text color="subdued">—</s-text>}</s-table-cell>
                   <s-table-cell>
                     <s-badge
+                      icon={
+                        m.status === "matched"
+                          ? "check-circle"
+                          : m.status === "ambiguous"
+                            ? "alert-triangle"
+                            : m.status === "ignored"
+                              ? "minus-circle"
+                              : "question-circle"
+                      }
                       tone={
                         m.status === "matched" ? "success" : m.status === "ambiguous" ? "critical" : m.status === "ignored" ? "neutral" : "warning"
                       }
