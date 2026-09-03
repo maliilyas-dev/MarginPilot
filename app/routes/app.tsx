@@ -45,8 +45,10 @@ function useSubmitButtonBridge() {
           const form = node.closest("form");
           if (form) {
             event.preventDefault();
-            event.stopPropagation();
-            submit(form);
+            // navigate:false runs the submission through an internal fetcher,
+            // the code path App Bridge intercepts to attach the session token.
+            // Redirects returned by actions are still followed.
+            submit(form, { navigate: false });
           }
           return;
         }
