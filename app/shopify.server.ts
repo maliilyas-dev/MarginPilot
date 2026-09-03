@@ -7,10 +7,12 @@ import {
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
 
-// Pinned Shopify Admin API version. The installed @shopify/shopify-app-react-router
-// exposes ApiVersion.October25 as its current stable release; the build spec's
-// nominal "2026-07" is not present in this SDK version. See BUILD_REPORT.md.
-export const API_VERSION = ApiVersion.October25;
+// Pinned Shopify Admin API version = 2026-07, the latest stable release the
+// installed @shopify/shopify-app-react-router SDK supports and the version the
+// build spec targets. 2026-10 is a release candidate as of the build date and
+// must not be used in production (spec rule 4). Keep this in sync with
+// app/config/apiVersion.ts and the [webhooks] api_version in shopify.app*.toml.
+export const API_VERSION = ApiVersion.July26;
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,

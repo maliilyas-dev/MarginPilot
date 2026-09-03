@@ -5,4 +5,4 @@
  * Keep this in sync with `shopify.app.toml` [webhooks].api_version and with
  * ApiVersion.October25 in app/shopify.server.ts.
  */
-export const SHOPIFY_API_VERSION = "2025-10";
+export const SHOPIFY_API_VERSION = "2026-07";

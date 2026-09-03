@@ -1,25 +1,32 @@
-# MarginPilot — base Shopify app configuration.
-# `shopify app config link` writes client_id here for the linked app.
-# Use shopify.app.development.toml / shopify.app.production.toml to keep
-# separate dev and prod apps (spec section 8): `shopify app config use <name>`.
+# MarginPilot — Shopify app configuration (linked to "Margin Pilot").
+# `shopify app deploy` uploads this. application_url + redirect_urls are set to
+# the production URL once hosting is live (see BUILD_REPORT.md §4).
 
-name = "MarginPilot"
-handle = "marginpilot"
-application_url = "https://example.com"
+client_id = "f05f1392668f7e783075813eda565f20"
+name = "Margin Pilot"
+handle = "margin-pilot"
+application_url = "https://shopify.dev/apps/default-app-home"
 embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true
 
 [access_scopes]
 scopes = "read_products,write_products,read_inventory,write_inventory,read_locations"
 
 [auth]
 redirect_urls = [
-  "https://example.com/auth/callback",
-  "https://example.com/auth/shopify/callback",
-  "https://example.com/api/auth/callback"
+  "https://shopify.dev/apps/default-app-home/auth/callback",
+  "https://shopify.dev/apps/default-app-home/auth/shopify/callback",
+  "https://shopify.dev/apps/default-app-home/api/auth/callback"
 ]
 
+# 2026-07 is the latest stable release supported by the installed
+# @shopify/shopify-app-react-router SDK. 2026-10 is a release candidate as of
+# this build date and must not be used in production (spec rule 4).
 [webhooks]
-api_version = "2025-10"
+api_version = "2026-07"
 
   [[webhooks.subscriptions]]
   uri = "/webhooks/app/uninstalled"
@@ -43,6 +50,3 @@ api_version = "2025-10"
 
 [pos]
 embedded = false
-
-[build]
-automatically_update_urls_on_dev = true
