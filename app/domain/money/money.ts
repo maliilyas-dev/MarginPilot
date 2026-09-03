@@ -4,6 +4,7 @@
  * Never use raw floating point for money anywhere in MarginPilot. Every
  * calculation that feeds a price, cost, or margin must go through decimal.js.
  */
+// eslint-disable-next-line import/no-named-as-default
 import Decimal from "decimal.js";
 
 // 28 significant digits is plenty for retail money math; ROUND_HALF_UP matches

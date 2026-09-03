@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { parseCsvString } from "../../app/domain/feeds/parseCsv";
+import type { NormalizedFeedRow } from "../../app/domain/feeds/normalizeFeed";
 import { normalizeRecord, flagDuplicateSkus } from "../../app/domain/feeds/normalizeFeed";
 import { validateColumnMappings } from "../../app/domain/feeds/canonicalFields";
 import { sha256, operationKey } from "../../app/domain/feeds/checksum";
@@ -75,7 +76,7 @@ describe("flagDuplicateSkus", () => {
       { supplierSkuNormalized: "a", rowNumber: 1 },
       { supplierSkuNormalized: "a", rowNumber: 2 },
       { supplierSkuNormalized: "b", rowNumber: 3 },
-    ] as any;
+    ] as Array<Partial<NormalizedFeedRow>> as NormalizedFeedRow[];
     const dupes = flagDuplicateSkus(rows);
     expect(dupes.get("a")).toEqual([1, 2]);
     expect(dupes.has("b")).toBe(false);

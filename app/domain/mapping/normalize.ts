@@ -51,7 +51,7 @@ export function parseLocaleNumber(
   }
 
   // Strip currency symbols / spaces / NBSP but keep sign, digits, . and ,
-  let s = rawStr.replace(/[\s  ]/g, "").replace(/[^0-9.,+-]/g, "");
+  let s = rawStr.replace(/[\s\u00A0\u202F]/g, "").replace(/[^0-9.,+-]/g, "");
   if (s === "" || s === "+" || s === "-") return { ok: false, value: null, raw: rawStr };
 
   const decSep = opts.decimalSeparator === "comma" ? "," : ".";

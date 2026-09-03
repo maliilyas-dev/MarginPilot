@@ -57,48 +57,48 @@ model Shop {
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
-  products      ShopifyProduct[]
-  variants      ShopifyVariant[]
-  suppliers     Supplier[]
-  pricingRules  PricingRule[]
-  safetyPolicy  SafetyPolicy?
-  feedRuns      FeedRun[]
-  changeSets    ChangeSet[]
-  alerts        Alert[]
-  auditEvents   AuditEvent[]
-  entitlement   BillingEntitlement?
-  catalogSyncs  CatalogSync[]
+  products     ShopifyProduct[]
+  variants     ShopifyVariant[]
+  suppliers    Supplier[]
+  pricingRules PricingRule[]
+  safetyPolicy SafetyPolicy?
+  feedRuns     FeedRun[]
+  changeSets   ChangeSet[]
+  alerts       Alert[]
+  auditEvents  AuditEvent[]
+  entitlement  BillingEntitlement?
+  catalogSyncs CatalogSync[]
 }
 
 model CatalogSync {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   shopId       String
-  shop         Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  status       String   @default("queued") // queued | running | completed | failed
-  startedAt    DateTime @default(now())
+  shop         Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  status       String    @default("queued") // queued | running | completed | failed
+  startedAt    DateTime  @default(now())
   completedAt  DateTime?
-  productCount Int      @default(0)
-  variantCount Int      @default(0)
+  productCount Int       @default(0)
+  variantCount Int       @default(0)
   errorSummary String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([shopId, startedAt])
 }
 
 model ShopifyProduct {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   shopId            String
-  shop              Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  shop              Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
   shopifyProductGid String
   title             String
   vendor            String?
   productType       String?
   status            String?
-  activeLocally     Boolean  @default(true)
+  activeLocally     Boolean   @default(true)
   shopifyUpdatedAt  DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   variants ShopifyVariant[]
 
@@ -108,9 +108,9 @@ model ShopifyProduct {
 }
 
 model ShopifyVariant {
-  id                      String   @id @default(cuid())
+  id                      String         @id @default(cuid())
   shopId                  String
-  shop                    Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  shop                    Shop           @relation(fields: [shopId], references: [id], onDelete: Cascade)
   productId               String
   product                 ShopifyProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
   shopifyVariantGid       String
@@ -119,19 +119,19 @@ model ShopifyVariant {
   skuNormalized           String?
   barcode                 String?
   title                   String?
-  price                   Decimal? @db.Decimal(18, 4)
-  compareAtPrice          Decimal? @db.Decimal(18, 4)
-  unitCost                Decimal? @db.Decimal(18, 4)
-  inventoryTracked        Boolean  @default(false)
-  activeLocally           Boolean  @default(true)
+  price                   Decimal?       @db.Decimal(18, 4)
+  compareAtPrice          Decimal?       @db.Decimal(18, 4)
+  unitCost                Decimal?       @db.Decimal(18, 4)
+  inventoryTracked        Boolean        @default(false)
+  activeLocally           Boolean        @default(true)
   shopifyUpdatedAt        DateTime?
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
 
-  inventory      VariantInventory[]
-  mappings       SupplierProductMapping[]
+  inventory       VariantInventory[]
+  mappings        SupplierProductMapping[]
   proposedChanges ProposedChange[]
-  changeItems    ChangeItem[]
+  changeItems     ChangeItem[]
 
   @@unique([shopId, shopifyVariantGid])
   @@index([shopId, skuNormalized])
@@ -139,12 +139,12 @@ model ShopifyVariant {
 }
 
 model VariantInventory {
-  id                String   @id @default(cuid())
+  id                String         @id @default(cuid())
   variantId         String
   variant           ShopifyVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
   locationGid       String
-  availableQuantity Int      @default(0)
-  lastSyncedAt      DateTime @default(now())
+  availableQuantity Int            @default(0)
+  lastSyncedAt      DateTime       @default(now())
 
   @@unique([variantId, locationGid])
 }
@@ -160,27 +160,27 @@ enum FeedType {
 }
 
 model Supplier {
-  id                 String         @id @default(cuid())
-  shopId             String
-  shop               Shop           @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  name               String
-  code               String
-  status             SupplierStatus @default(active)
-  feedType           FeedType       @default(upload_csv)
-  feedUrl            String?
-  encryptedCredentials String?      // AES-256-GCM payload, never returned to browser
-  delimiter          String         @default("auto") // auto | comma | semicolon | tab | pipe
-  decimalSeparator   String         @default("dot")  // dot | comma
-  thousandsSeparator String?
-  currencyCode       String         @default("USD")
-  defaultLocationGid String?
-  schedule           String         @default("manual") // manual | hourly | every_6_hours | daily
-  timezone           String         @default("UTC")
-  barcodeMatching    Boolean        @default(false)
-  lastRunAt          DateTime?
-  lastSuccessAt      DateTime?
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
+  id                   String         @id @default(cuid())
+  shopId               String
+  shop                 Shop           @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name                 String
+  code                 String
+  status               SupplierStatus @default(active)
+  feedType             FeedType       @default(upload_csv)
+  feedUrl              String?
+  encryptedCredentials String? // AES-256-GCM payload, never returned to browser
+  delimiter            String         @default("auto") // auto | comma | semicolon | tab | pipe
+  decimalSeparator     String         @default("dot") // dot | comma
+  thousandsSeparator   String?
+  currencyCode         String         @default("USD")
+  defaultLocationGid   String?
+  schedule             String         @default("manual") // manual | hourly | every_6_hours | daily
+  timezone             String         @default("UTC")
+  barcodeMatching      Boolean        @default(false)
+  lastRunAt            DateTime?
+  lastSuccessAt        DateTime?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
 
   mappingProfiles FeedMappingProfile[]
   productMappings SupplierProductMapping[]
@@ -193,15 +193,15 @@ model Supplier {
 }
 
 model FeedMappingProfile {
-  id                 String   @id @default(cuid())
-  supplierId         String
-  supplier           Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  name               String
-  headerFingerprint  String
-  columnMappings     Json     // { canonicalField: headerName }
-  isDefault          Boolean  @default(false)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                String   @id @default(cuid())
+  supplierId        String
+  supplier          Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  name              String
+  headerFingerprint String
+  columnMappings    Json // { canonicalField: headerName }
+  isDefault         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@index([supplierId, headerFingerprint])
 }
@@ -221,61 +221,61 @@ enum MappingStatus {
 }
 
 model SupplierProductMapping {
-  id                    String        @id @default(cuid())
+  id                    String          @id @default(cuid())
   supplierId            String
-  supplier              Supplier      @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplier              Supplier        @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   supplierSkuOriginal   String
   supplierSkuNormalized String
   variantId             String?
   variant               ShopifyVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
-  matchMethod           MatchMethod   @default(exact_sku)
-  status                MappingStatus @default(unmatched)
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
+  matchMethod           MatchMethod     @default(exact_sku)
+  status                MappingStatus   @default(unmatched)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
 
   @@unique([supplierId, supplierSkuNormalized])
   @@index([supplierId, status])
 }
 
 model PricingRule {
-  id                   String   @id @default(cuid())
+  id                   String    @id @default(cuid())
   shopId               String
-  shop                 Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  shop                 Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
   supplierId           String?
   supplier             Supplier? @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   name                 String
-  priority             Int      @default(100)
+  priority             Int       @default(100)
   vendorFilter         String?
   productTypeFilter    String?
-  minimumMarginPercent Decimal  @default(0) @db.Decimal(9, 4)
-  markupPercent        Decimal  @default(0) @db.Decimal(9, 4)
-  fixedHandlingPerUnit Decimal  @default(0) @db.Decimal(18, 4)
-  dutyPercent          Decimal  @default(0) @db.Decimal(9, 4)
-  otherCostPercent     Decimal  @default(0) @db.Decimal(9, 4)
-  roundingRule         String   @default("none") // none | whole | end_99 | end_95 | end_97
-  minimumPrice         Decimal? @db.Decimal(18, 4)
-  maximumPrice         Decimal? @db.Decimal(18, 4)
-  active               Boolean  @default(true)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  minimumMarginPercent Decimal   @default(0) @db.Decimal(9, 4)
+  markupPercent        Decimal   @default(0) @db.Decimal(9, 4)
+  fixedHandlingPerUnit Decimal   @default(0) @db.Decimal(18, 4)
+  dutyPercent          Decimal   @default(0) @db.Decimal(9, 4)
+  otherCostPercent     Decimal   @default(0) @db.Decimal(9, 4)
+  roundingRule         String    @default("none") // none | whole | end_99 | end_95 | end_97
+  minimumPrice         Decimal?  @db.Decimal(18, 4)
+  maximumPrice         Decimal?  @db.Decimal(18, 4)
+  active               Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   @@index([shopId, priority])
   @@index([supplierId, priority])
 }
 
 model SafetyPolicy {
-  id                        String   @id @default(cuid())
-  shopId                    String   @unique
-  shop                      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  maxPriceDecreasePercent   Decimal  @default(20) @db.Decimal(9, 4)
-  maxPriceIncreasePercent   Decimal  @default(50) @db.Decimal(9, 4)
-  maxInventoryChangePercent Decimal  @default(90) @db.Decimal(9, 4)
-  maxInventoryAbsoluteChange Int     @default(1000)
-  maxInvalidRowPercent      Decimal  @default(10) @db.Decimal(9, 4)
-  maxRowCountDecreasePercent Decimal @default(50) @db.Decimal(9, 4)
-  allowZeroCost             Boolean  @default(false)
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  id                         String   @id @default(cuid())
+  shopId                     String   @unique
+  shop                       Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  maxPriceDecreasePercent    Decimal  @default(20) @db.Decimal(9, 4)
+  maxPriceIncreasePercent    Decimal  @default(50) @db.Decimal(9, 4)
+  maxInventoryChangePercent  Decimal  @default(90) @db.Decimal(9, 4)
+  maxInventoryAbsoluteChange Int      @default(1000)
+  maxInvalidRowPercent       Decimal  @default(10) @db.Decimal(9, 4)
+  maxRowCountDecreasePercent Decimal  @default(50) @db.Decimal(9, 4)
+  allowZeroCost              Boolean  @default(false)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 }
 
 enum FeedRunStatus {
@@ -372,28 +372,28 @@ enum ChangeClassification {
 }
 
 model ProposedChange {
-  id                        String   @id @default(cuid())
-  feedRunId                 String
-  feedRun                   FeedRun  @relation(fields: [feedRunId], references: [id], onDelete: Cascade)
-  feedRowId                 String   @unique
-  feedRow                   FeedRow  @relation(fields: [feedRowId], references: [id], onDelete: Cascade)
-  variantId                 String?
-  variant                   ShopifyVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
-  mappingStatus             MappingStatus @default(unmatched)
-  currentQuantity           Int?
-  proposedQuantity          Int?
-  currentUnitCost           Decimal? @db.Decimal(18, 4)
-  supplierUnitCost          Decimal? @db.Decimal(18, 4)
-  landedCost                Decimal? @db.Decimal(18, 4)
-  currentPrice              Decimal? @db.Decimal(18, 4)
-  recommendedPrice          Decimal? @db.Decimal(18, 4)
-  currentMarginPercent      Decimal? @db.Decimal(9, 4)
-  recommendedMarginPercent  Decimal? @db.Decimal(9, 4)
-  classification            ChangeClassification @default(unmatched)
-  reasonCodes               Json     @default("[]")
-  overrideApproved          Boolean  @default(false)
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  id                       String               @id @default(cuid())
+  feedRunId                String
+  feedRun                  FeedRun              @relation(fields: [feedRunId], references: [id], onDelete: Cascade)
+  feedRowId                String               @unique
+  feedRow                  FeedRow              @relation(fields: [feedRowId], references: [id], onDelete: Cascade)
+  variantId                String?
+  variant                  ShopifyVariant?      @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  mappingStatus            MappingStatus        @default(unmatched)
+  currentQuantity          Int?
+  proposedQuantity         Int?
+  currentUnitCost          Decimal?             @db.Decimal(18, 4)
+  supplierUnitCost         Decimal?             @db.Decimal(18, 4)
+  landedCost               Decimal?             @db.Decimal(18, 4)
+  currentPrice             Decimal?             @db.Decimal(18, 4)
+  recommendedPrice         Decimal?             @db.Decimal(18, 4)
+  currentMarginPercent     Decimal?             @db.Decimal(9, 4)
+  recommendedMarginPercent Decimal?             @db.Decimal(9, 4)
+  classification           ChangeClassification @default(unmatched)
+  reasonCodes              Json                 @default("[]")
+  overrideApproved         Boolean              @default(false)
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
 
   changeItems ChangeItem[]
 
@@ -411,20 +411,20 @@ enum ChangeSetStatus {
 }
 
 model ChangeSet {
-  id             String          @id @default(cuid())
-  shopId         String
-  shop           Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  feedRunId      String
-  feedRun        FeedRun         @relation(fields: [feedRunId], references: [id], onDelete: Cascade)
-  status         ChangeSetStatus @default(pending)
-  updateInventory Boolean        @default(false)
-  updatePrice    Boolean         @default(false)
-  updateUnitCost Boolean         @default(false)
-  approvedBy     String?
-  approvedAt     DateTime?
-  idempotencyKey String          @unique
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  id              String          @id @default(cuid())
+  shopId          String
+  shop            Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  feedRunId       String
+  feedRun         FeedRun         @relation(fields: [feedRunId], references: [id], onDelete: Cascade)
+  status          ChangeSetStatus @default(pending)
+  updateInventory Boolean         @default(false)
+  updatePrice     Boolean         @default(false)
+  updateUnitCost  Boolean         @default(false)
+  approvedBy      String?
+  approvedAt      DateTime?
+  idempotencyKey  String          @unique
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   items ChangeItem[]
 
@@ -440,24 +440,24 @@ enum ChangeItemStatus {
 }
 
 model ChangeItem {
-  id               String   @id @default(cuid())
-  changeSetId      String
-  changeSet        ChangeSet @relation(fields: [changeSetId], references: [id], onDelete: Cascade)
-  proposedChangeId String
-  proposedChange   ProposedChange @relation(fields: [proposedChangeId], references: [id], onDelete: Cascade)
-  variantId        String
-  variant          ShopifyVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  id                String           @id @default(cuid())
+  changeSetId       String
+  changeSet         ChangeSet        @relation(fields: [changeSetId], references: [id], onDelete: Cascade)
+  proposedChangeId  String
+  proposedChange    ProposedChange   @relation(fields: [proposedChangeId], references: [id], onDelete: Cascade)
+  variantId         String
+  variant           ShopifyVariant   @relation(fields: [variantId], references: [id], onDelete: Cascade)
   operationSnapshot Json
-  status           ChangeItemStatus @default(queued)
-  attemptCount     Int      @default(0)
-  previousValues   Json?
-  requestedValues  Json?
-  returnedValues   Json?
+  status            ChangeItemStatus @default(queued)
+  attemptCount      Int              @default(0)
+  previousValues    Json?
+  requestedValues   Json?
+  returnedValues    Json?
   shopifyUserErrors Json?
-  lastError        String?
-  appliedAt        DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  lastError         String?
+  appliedAt         DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   @@unique([changeSetId, proposedChangeId])
   @@index([changeSetId, status])
@@ -500,7 +500,7 @@ model AuditEvent {
   id              String   @id @default(cuid())
   shopId          String
   shop            Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  actorType       String   // merchant | system | webhook
+  actorType       String // merchant | system | webhook
   actorIdentifier String?
   action          String
   resourceType    String
@@ -516,22 +516,22 @@ model AuditEvent {
 }
 
 model BillingEntitlement {
-  id                    String   @id @default(cuid())
-  shopId                String   @unique
-  shop                  Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  planCode              String   @default("free") // free | starter | growth | pro | beta
-  status                String   @default("active")
+  id                    String    @id @default(cuid())
+  shopId                String    @unique
+  shop                  Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  planCode              String    @default("free") // free | starter | growth | pro | beta
+  status                String    @default("active")
   trialEndsAt           DateTime?
   subscriptionReference String?
-  limits                Json     @default("{}")
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  limits                Json      @default("{}")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 }
 
 model WebhookEvent {
-  id          String   @id @default(cuid())
-  webhookId   String   @unique
-  topic       String
-  shopDomain  String
-  receivedAt  DateTime @default(now())
+  id         String   @id @default(cuid())
+  webhookId  String   @unique
+  topic      String
+  shopDomain String
+  receivedAt DateTime @default(now())
 }
