@@ -1,0 +1,6 @@
+supplier_sku,name,available_quantity,unit_cost,msrp,freight_per_unit,barcode
+ABC-100,Example Product A,24,12.50,29.99,1.25,100000000001
+ABC-101,Example Product B,0,18.00,39.99,1.50,100000000002
+ABC-102,Example Product C,7,0,49.99,2.00,100000000003
+ABC-103,Example Product D,-5,21.50,54.99,2.25,100000000004
+ABC-104,Example Product E,10000,9999.00,69.99,3.00,100000000005
