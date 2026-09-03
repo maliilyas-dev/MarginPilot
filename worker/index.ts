@@ -61,7 +61,7 @@ makeWorker(QUEUE_NAMES.feedFetch, async (job: Job<FeedFetchJob>) => {
   await getQueue(QUEUE_NAMES.feedProcess).add(
     "process",
     { shopId, supplierId, feedRunId } satisfies FeedProcessJob,
-    { jobId: `feed-process:${feedRunId}` },
+    { jobId: `feed-process-${feedRunId}` },
   );
 });
 
@@ -118,7 +118,7 @@ makeWorker(QUEUE_NAMES.scheduledRuns, async () => {
     await getQueue(QUEUE_NAMES.feedFetch).add(
       "fetch",
       { shopId: s.shopId, supplierId: s.id, feedRunId: run.id } satisfies FeedFetchJob,
-      { jobId: `feed-fetch:${run.id}` },
+      { jobId: `feed-fetch-${run.id}` },
     );
     log.info({ supplierId: s.id, feedRunId: run.id }, "scheduled feed run enqueued");
   }

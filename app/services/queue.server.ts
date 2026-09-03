@@ -83,22 +83,22 @@ export interface CleanupJob {
 
 export async function enqueueCatalogSync(data: CatalogSyncJob) {
   return getQueue(QUEUE_NAMES.catalogSync).add("sync", data, {
-    jobId: `catalog-sync:${data.catalogSyncId}`,
+    jobId: `catalog-sync-${data.catalogSyncId}`,
   });
 }
 export async function enqueueFeedFetch(data: FeedFetchJob) {
   return getQueue(QUEUE_NAMES.feedFetch).add("fetch", data, {
-    jobId: `feed-fetch:${data.feedRunId}`,
+    jobId: `feed-fetch-${data.feedRunId}`,
   });
 }
 export async function enqueueFeedProcess(data: FeedProcessJob) {
   return getQueue(QUEUE_NAMES.feedProcess).add("process", data, {
-    jobId: `feed-process:${data.feedRunId}`,
+    jobId: `feed-process-${data.feedRunId}`,
   });
 }
 export async function enqueueChangesApply(data: ChangesApplyJob) {
   return getQueue(QUEUE_NAMES.changesApply).add("apply", data, {
-    jobId: `changes-apply:${data.changeSetId}`,
+    jobId: `changes-apply-${data.changeSetId}`,
   });
 }
 
