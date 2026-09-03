@@ -15,11 +15,14 @@ const BUILD_PATH = "./build/server/index.js";
 const PORT = Number(process.env.PORT || 3000);
 
 const ALLOWED_ACTION_ORIGINS = [
+  "null",
   "admin.shopify.com",
   "*.shopify.com",
   "**.shopify.com",
   "*.myshopify.com",
   "**.myshopify.com",
+  "marginpilot-production.up.railway.app",
+  "*.up.railway.app",
   "*.spin.dev",
 ];
 
@@ -40,6 +43,17 @@ app.use(
   express.static("build/client/assets", { immutable: true, maxAge: "1y" }),
 );
 app.use(express.static("build/client", { maxAge: "1h" }));
+
+// Temporary: log every mutation request's origin so we can see what the
+// embedded iframe actually sends. Remove once the CSRF issue is settled.
+app.use((req, _res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    console.log(
+      `[req] ${req.method} ${req.originalUrl} origin=${JSON.stringify(req.get("origin"))} referer=${JSON.stringify(req.get("referer"))} sec-fetch-site=${JSON.stringify(req.get("sec-fetch-site"))}`,
+    );
+  }
+  next();
+});
 
 // Mounted as middleware (not app.all("*")) so it works on both Express 4 and 5.
 app.use(
