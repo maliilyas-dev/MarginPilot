@@ -26,7 +26,7 @@ export async function requestCatalogSync(
   if (active) {
     // Recover from a sync that died without recording a terminal status.
     const staleMs = Date.now() - new Date(active.startedAt).getTime();
-    if (staleMs < 15 * 60 * 1000) {
+    if (staleMs < 3 * 60 * 1000) {
       return { ok: true, catalogSyncId: active.id, alreadyRunning: true };
     }
     await prisma.catalogSync.update({
