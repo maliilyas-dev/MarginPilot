@@ -37,6 +37,16 @@ const ONBOARDING_STEPS: Array<{ key: string; label: string; href: string }> = [
 
 export default function Home() {
   const { data, error } = useLoaderData<typeof loader>();
+  const sync = useFetcher<{ ok: boolean; alreadyRunning?: boolean }>();
+  const revalidator = useRevalidator();
+  const syncing = sync.state !== "idle";
+
+  useEffect(() => {
+    if (sync.data?.ok) {
+      const t = setTimeout(() => revalidator.revalidate(), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [sync.data, revalidator]);
 
   if (error || !data) {
     return (
@@ -53,18 +63,6 @@ export default function Home() {
 
   const onboarding = data.onboarding as Record<string, boolean>;
   const doneCount = ONBOARDING_STEPS.filter((s) => onboarding[s.key]).length;
-
-  const sync = useFetcher<{ ok: boolean; alreadyRunning?: boolean }>();
-  const revalidator = useRevalidator();
-  const syncing = sync.state !== "idle";
-
-  useEffect(() => {
-    if (sync.data?.ok) {
-      const t = setTimeout(() => revalidator.revalidate(), 4000);
-      return () => clearTimeout(t);
-    }
-  }, [sync.data, revalidator]);
-
   const unresolved = data.alerts.critical + data.alerts.warning;
 
   return (
