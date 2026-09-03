@@ -114,7 +114,7 @@ Webhooks: `app/uninstalled` (cancel schedules, revoke access, mark uninstalled),
 401) with webhook-id dedupe.
 
 ### Config / ops
-- `shopify.app.toml` + `shopify.app.development.toml` + `shopify.app.production.toml`
+- `shopify.app.margin-pilot.toml` (linked/active) + `shopify.app.development.toml` + `shopify.app.production.toml` (references)
   — min scopes, all webhook subscriptions incl. 3 compliance topics, `api_version = "2025-10"`.
 - `.env.example` — full environment contract.
 - `docker-compose.yml` — Postgres 16 + Redis 7 with healthchecks.

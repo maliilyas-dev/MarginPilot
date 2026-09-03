@@ -2,6 +2,11 @@
 # Link with:  shopify app config link --config production
 # Select with: shopify app config use production
 # Deploy with: shopify app deploy --config production
+#
+# NOTE: shopify.app.margin-pilot.toml is the linked / active config. This file
+# is a reference mirror of the production settings.
+
+client_id = "fbbaded3ccef01d48a75b86d52b5c1d8"
 
 name = "MarginPilot"
 handle = "marginpilot-production"

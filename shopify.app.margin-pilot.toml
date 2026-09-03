@@ -1,16 +1,17 @@
-# MarginPilot — Shopify app configuration (linked to "Margin Pilot").
-# `shopify app deploy` uploads this. application_url + redirect_urls are set to
-# the production URL once hosting is live (see BUILD_REPORT.md §4).
+# MarginPilot — Shopify app configuration.
+# Linked app: "margin-pilot" in the AIDev Labs Partner org (client_id below).
+# This is the DEFAULT / linked config (see .shopify). `shopify app deploy`
+# uploads it. shopify.app.production.toml / .development.toml are reference
+# copies only — this file is the source of truth.
 
-client_id = "f05f1392668f7e783075813eda565f20"
-name = "Margin Pilot"
-handle = "margin-pilot"
+client_id = "fbbaded3ccef01d48a75b86d52b5c1d8"
+name = "MarginPilot"
+handle = "marginpilot"
 application_url = "https://marginpilot-production.up.railway.app"
 embedded = true
 
 [build]
 automatically_update_urls_on_dev = true
-include_config_on_deploy = true
 
 [access_scopes]
 scopes = "read_products,write_products,read_inventory,write_inventory,read_locations"
@@ -22,9 +23,11 @@ redirect_urls = [
   "https://marginpilot-production.up.railway.app/api/auth/callback"
 ]
 
-# 2026-07 is the latest stable release supported by the installed
-# @shopify/shopify-app-react-router SDK. 2026-10 is a release candidate as of
-# this build date and must not be used in production (spec rule 4).
+# 2026-07 is the latest stable release the installed
+# @shopify/shopify-app-react-router SDK supports and the version the build spec
+# targets. 2026-10 is a release candidate as of the build date and must not be
+# used in production (spec rule 4). Keep in sync with app/config/apiVersion.ts
+# and app/shopify.server.ts.
 [webhooks]
 api_version = "2026-07"
 
