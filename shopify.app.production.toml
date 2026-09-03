@@ -9,7 +9,6 @@
 client_id = "fbbaded3ccef01d48a75b86d52b5c1d8"
 
 name = "MarginPilot"
-handle = "marginpilot-production"
 application_url = "https://marginpilot-production.up.railway.app"
 embedded = true
 
