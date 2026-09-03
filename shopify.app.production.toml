@@ -5,7 +5,7 @@
 
 name = "MarginPilot"
 handle = "marginpilot-production"
-application_url = "https://REPLACE-WITH-production-URL"
+application_url = "https://marginpilot-production.up.railway.app"
 embedded = true
 
 [access_scopes]
@@ -13,9 +13,9 @@ scopes = "read_products,write_products,read_inventory,write_inventory,read_locat
 
 [auth]
 redirect_urls = [
-  "https://REPLACE-WITH-production-URL/auth/callback",
-  "https://REPLACE-WITH-production-URL/auth/shopify/callback",
-  "https://REPLACE-WITH-production-URL/api/auth/callback"
+  "https://marginpilot-production.up.railway.app/auth/callback",
+  "https://marginpilot-production.up.railway.app/auth/shopify/callback",
+  "https://marginpilot-production.up.railway.app/api/auth/callback"
 ]
 
 [webhooks]
