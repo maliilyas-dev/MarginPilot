@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Outlet, useLoaderData, useRouteError } from "react-router";
+import { Outlet, useLoaderData, useRouteError, useSubmit } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { NavMenu } from "@shopify/app-bridge-react";
@@ -17,30 +17,36 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 /**
- * Polaris web-component `<s-button type="submit">` does not reliably submit its
- * enclosing native <form> inside the embedded App Bridge iframe. Delegate:
- * on any click that lands on an s-* submit control inside a <form>, call
- * form.requestSubmit() so React Router's <Form>/<fetcher.Form> handling runs.
+ * Two problems this solves for the embedded app:
+ *  1. Polaris `<s-button type="submit">` doesn't reliably submit its native
+ *     <form> inside the App Bridge iframe.
+ *  2. A *native* form POST carries no App Bridge session token, so Shopify
+ *     can't authenticate it, bounces it through a token exchange, and the
+ *     form body is lost.
+ * Fix: intercept clicks on s-* submit controls and submit the form through
+ * React Router's `submit()`, which goes over `fetch` — App Bridge patches
+ * `fetch` to attach `Authorization: Bearer <sessionToken>`.
  */
 function useSubmitButtonBridge() {
+  const submit = useSubmit();
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
+      if (event.defaultPrevented) return;
       const path = event.composedPath();
       for (const node of path) {
         if (!(node instanceof HTMLElement)) continue;
         const tag = node.tagName.toLowerCase();
-        if (tag === "form") return; // reached the form without a submit control
+        if (tag === "form") return;
         const isSubmit =
           (tag === "s-button" || tag === "button") &&
           (node.getAttribute("type") === "submit" || node.getAttribute("submit") !== null);
         if (isSubmit) {
           if (node.hasAttribute("disabled")) return;
           const form = node.closest("form");
-          if (form && typeof form.requestSubmit === "function") {
+          if (form) {
             event.preventDefault();
             event.stopPropagation();
-            // Let any App Bridge internals settle, then submit once.
-            form.requestSubmit();
+            submit(form);
           }
           return;
         }
@@ -48,7 +54,7 @@ function useSubmitButtonBridge() {
     };
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
-  }, []);
+  }, [submit]);
 }
 
 export default function App() {
