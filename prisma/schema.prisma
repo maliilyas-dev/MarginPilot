@@ -1,0 +1,537 @@
+// MarginPilot — Prisma schema
+// PostgreSQL. All Shopify GIDs stored as String. Money stored as Decimal.
+// See MarginPilot-Shopify-App-Claude-Code-Build-Spec.md section 9.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Shopify offline session storage — required shape for
+/// @shopify/shopify-app-session-storage-prisma. Do not rename fields.
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+
+  @@index([shop])
+}
+
+enum ShopStatus {
+  active
+  uninstalled
+  redaction_pending
+  redacted
+}
+
+model Shop {
+  id                 String     @id @default(cuid())
+  shopDomain         String     @unique
+  shopifyShopGid     String?
+  status             ShopStatus @default(active)
+  defaultLocationGid String?
+  timezone           String     @default("UTC")
+  currencyCode       String     @default("USD")
+  onboardingState    Json       @default("{}")
+  installedAt        DateTime   @default(now())
+  uninstalledAt      DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  products      ShopifyProduct[]
+  variants      ShopifyVariant[]
+  suppliers     Supplier[]
+  pricingRules  PricingRule[]
+  safetyPolicy  SafetyPolicy?
+  feedRuns      FeedRun[]
+  changeSets    ChangeSet[]
+  alerts        Alert[]
+  auditEvents   AuditEvent[]
+  entitlement   BillingEntitlement?
+  catalogSyncs  CatalogSync[]
+}
+
+model CatalogSync {
+  id           String   @id @default(cuid())
+  shopId       String
+  shop         Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  status       String   @default("queued") // queued | running | completed | failed
+  startedAt    DateTime @default(now())
+  completedAt  DateTime?
+  productCount Int      @default(0)
+  variantCount Int      @default(0)
+  errorSummary String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([shopId, startedAt])
+}
+
+model ShopifyProduct {
+  id                String   @id @default(cuid())
+  shopId            String
+  shop              Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  shopifyProductGid String
+  title             String
+  vendor            String?
+  productType       String?
+  status            String?
+  activeLocally     Boolean  @default(true)
+  shopifyUpdatedAt  DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  variants ShopifyVariant[]
+
+  @@unique([shopId, shopifyProductGid])
+  @@index([shopId, vendor])
+  @@index([shopId, productType])
+}
+
+model ShopifyVariant {
+  id                      String   @id @default(cuid())
+  shopId                  String
+  shop                    Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  productId               String
+  product                 ShopifyProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  shopifyVariantGid       String
+  shopifyInventoryItemGid String?
+  skuOriginal             String?
+  skuNormalized           String?
+  barcode                 String?
+  title                   String?
+  price                   Decimal? @db.Decimal(18, 4)
+  compareAtPrice          Decimal? @db.Decimal(18, 4)
+  unitCost                Decimal? @db.Decimal(18, 4)
+  inventoryTracked        Boolean  @default(false)
+  activeLocally           Boolean  @default(true)
+  shopifyUpdatedAt        DateTime?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  inventory      VariantInventory[]
+  mappings       SupplierProductMapping[]
+  proposedChanges ProposedChange[]
+  changeItems    ChangeItem[]
+
+  @@unique([shopId, shopifyVariantGid])
+  @@index([shopId, skuNormalized])
+  @@index([shopId, barcode])
+}
+
+model VariantInventory {
+  id                String   @id @default(cuid())
+  variantId         String
+  variant           ShopifyVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  locationGid       String
+  availableQuantity Int      @default(0)
+  lastSyncedAt      DateTime @default(now())
+
+  @@unique([variantId, locationGid])
+}
+
+enum SupplierStatus {
+  active
+  inactive
+}
+
+enum FeedType {
+  upload_csv
+  url_csv
+}
+
+model Supplier {
+  id                 String         @id @default(cuid())
+  shopId             String
+  shop               Shop           @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name               String
+  code               String
+  status             SupplierStatus @default(active)
+  feedType           FeedType       @default(upload_csv)
+  feedUrl            String?
+  encryptedCredentials String?      // AES-256-GCM payload, never returned to browser
+  delimiter          String         @default("auto") // auto | comma | semicolon | tab | pipe
+  decimalSeparator   String         @default("dot")  // dot | comma
+  thousandsSeparator String?
+  currencyCode       String         @default("USD")
+  defaultLocationGid String?
+  schedule           String         @default("manual") // manual | hourly | every_6_hours | daily
+  timezone           String         @default("UTC")
+  barcodeMatching    Boolean        @default(false)
+  lastRunAt          DateTime?
+  lastSuccessAt      DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  mappingProfiles FeedMappingProfile[]
+  productMappings SupplierProductMapping[]
+  pricingRules    PricingRule[]
+  feedRuns        FeedRun[]
+  alerts          Alert[]
+
+  @@unique([shopId, code])
+  @@index([shopId, status])
+}
+
+model FeedMappingProfile {
+  id                 String   @id @default(cuid())
+  supplierId         String
+  supplier           Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  name               String
+  headerFingerprint  String
+  columnMappings     Json     // { canonicalField: headerName }
+  isDefault          Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([supplierId, headerFingerprint])
+}
+
+enum MatchMethod {
+  explicit
+  exact_sku
+  exact_barcode
+  ignored
+}
+
+enum MappingStatus {
+  matched
+  unmatched
+  ambiguous
+  ignored
+}
+
+model SupplierProductMapping {
+  id                    String        @id @default(cuid())
+  supplierId            String
+  supplier              Supplier      @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplierSkuOriginal   String
+  supplierSkuNormalized String
+  variantId             String?
+  variant               ShopifyVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  matchMethod           MatchMethod   @default(exact_sku)
+  status                MappingStatus @default(unmatched)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  @@unique([supplierId, supplierSkuNormalized])
+  @@index([supplierId, status])
+}
+
+model PricingRule {
+  id                   String   @id @default(cuid())
+  shopId               String
+  shop                 Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  supplierId           String?
+  supplier             Supplier? @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  name                 String
+  priority             Int      @default(100)
+  vendorFilter         String?
+  productTypeFilter    String?
+  minimumMarginPercent Decimal  @default(0) @db.Decimal(9, 4)
+  markupPercent        Decimal  @default(0) @db.Decimal(9, 4)
+  fixedHandlingPerUnit Decimal  @default(0) @db.Decimal(18, 4)
+  dutyPercent          Decimal  @default(0) @db.Decimal(9, 4)
+  otherCostPercent     Decimal  @default(0) @db.Decimal(9, 4)
+  roundingRule         String   @default("none") // none | whole | end_99 | end_95 | end_97
+  minimumPrice         Decimal? @db.Decimal(18, 4)
+  maximumPrice         Decimal? @db.Decimal(18, 4)
+  active               Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([shopId, priority])
+  @@index([supplierId, priority])
+}
+
+model SafetyPolicy {
+  id                        String   @id @default(cuid())
+  shopId                    String   @unique
+  shop                      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  maxPriceDecreasePercent   Decimal  @default(20) @db.Decimal(9, 4)
+  maxPriceIncreasePercent   Decimal  @default(50) @db.Decimal(9, 4)
+  maxInventoryChangePercent Decimal  @default(90) @db.Decimal(9, 4)
+  maxInventoryAbsoluteChange Int     @default(1000)
+  maxInvalidRowPercent      Decimal  @default(10) @db.Decimal(9, 4)
+  maxRowCountDecreasePercent Decimal @default(50) @db.Decimal(9, 4)
+  allowZeroCost             Boolean  @default(false)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+}
+
+enum FeedRunStatus {
+  queued
+  fetching
+  parsing
+  validating
+  mapping
+  calculating
+  ready_for_review
+  applying
+  completed
+  partially_completed
+  failed
+  cancelled
+}
+
+enum FeedRunTrigger {
+  manual_upload
+  manual_url
+  scheduled
+}
+
+model FeedRun {
+  id                String         @id @default(cuid())
+  shopId            String
+  shop              Shop           @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  supplierId        String
+  supplier          Supplier       @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  trigger           FeedRunTrigger
+  status            FeedRunStatus  @default(queued)
+  sourceFilename    String?
+  sourceChecksum    String?
+  headerFingerprint String?
+  rowCount          Int            @default(0)
+  validCount        Int            @default(0)
+  invalidCount      Int            @default(0)
+  matchedCount      Int            @default(0)
+  unmatchedCount    Int            @default(0)
+  ambiguousCount    Int            @default(0)
+  safeChangeCount   Int            @default(0)
+  warningCount      Int            @default(0)
+  blockedCount      Int            @default(0)
+  rulesSnapshot     Json?
+  safetySnapshot    Json?
+  errorSummary      String?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  rows            FeedRow[]
+  proposedChanges ProposedChange[]
+  changeSets      ChangeSet[]
+  alerts          Alert[]
+
+  @@unique([supplierId, sourceChecksum])
+  @@index([shopId, status])
+  @@index([supplierId, createdAt])
+}
+
+model FeedRow {
+  id                     String   @id @default(cuid())
+  feedRunId              String
+  feedRun                FeedRun  @relation(fields: [feedRunId], references: [id], onDelete: Cascade)
+  rowNumber              Int
+  supplierSkuOriginal    String?
+  supplierSkuNormalized  String?
+  supplierName           String?
+  barcode                String?
+  manufacturerPartNumber String?
+  quantity               Int?
+  unitCost               Decimal? @db.Decimal(18, 4)
+  msrp                   Decimal? @db.Decimal(18, 4)
+  packSize               Decimal? @db.Decimal(18, 4)
+  freightPerUnit         Decimal? @db.Decimal(18, 4)
+  rawData                Json?
+  validationStatus       String   @default("valid") // valid | invalid
+  validationErrors       Json?
+  createdAt              DateTime @default(now())
+
+  proposedChange ProposedChange?
+
+  @@index([feedRunId, supplierSkuNormalized])
+}
+
+enum ChangeClassification {
+  unchanged
+  safe
+  warning
+  blocked
+  invalid
+  unmatched
+}
+
+model ProposedChange {
+  id                        String   @id @default(cuid())
+  feedRunId                 String
+  feedRun                   FeedRun  @relation(fields: [feedRunId], references: [id], onDelete: Cascade)
+  feedRowId                 String   @unique
+  feedRow                   FeedRow  @relation(fields: [feedRowId], references: [id], onDelete: Cascade)
+  variantId                 String?
+  variant                   ShopifyVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  mappingStatus             MappingStatus @default(unmatched)
+  currentQuantity           Int?
+  proposedQuantity          Int?
+  currentUnitCost           Decimal? @db.Decimal(18, 4)
+  supplierUnitCost          Decimal? @db.Decimal(18, 4)
+  landedCost                Decimal? @db.Decimal(18, 4)
+  currentPrice              Decimal? @db.Decimal(18, 4)
+  recommendedPrice          Decimal? @db.Decimal(18, 4)
+  currentMarginPercent      Decimal? @db.Decimal(9, 4)
+  recommendedMarginPercent  Decimal? @db.Decimal(9, 4)
+  classification            ChangeClassification @default(unmatched)
+  reasonCodes               Json     @default("[]")
+  overrideApproved          Boolean  @default(false)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  changeItems ChangeItem[]
+
+  @@index([feedRunId, classification])
+}
+
+enum ChangeSetStatus {
+  pending
+  queued
+  applying
+  completed
+  partially_completed
+  failed
+  cancelled
+}
+
+model ChangeSet {
+  id             String          @id @default(cuid())
+  shopId         String
+  shop           Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  feedRunId      String
+  feedRun        FeedRun         @relation(fields: [feedRunId], references: [id], onDelete: Cascade)
+  status         ChangeSetStatus @default(pending)
+  updateInventory Boolean        @default(false)
+  updatePrice    Boolean         @default(false)
+  updateUnitCost Boolean         @default(false)
+  approvedBy     String?
+  approvedAt     DateTime?
+  idempotencyKey String          @unique
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  items ChangeItem[]
+
+  @@index([shopId, status])
+}
+
+enum ChangeItemStatus {
+  queued
+  applying
+  succeeded
+  failed
+  skipped
+}
+
+model ChangeItem {
+  id               String   @id @default(cuid())
+  changeSetId      String
+  changeSet        ChangeSet @relation(fields: [changeSetId], references: [id], onDelete: Cascade)
+  proposedChangeId String
+  proposedChange   ProposedChange @relation(fields: [proposedChangeId], references: [id], onDelete: Cascade)
+  variantId        String
+  variant          ShopifyVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  operationSnapshot Json
+  status           ChangeItemStatus @default(queued)
+  attemptCount     Int      @default(0)
+  previousValues   Json?
+  requestedValues  Json?
+  returnedValues   Json?
+  shopifyUserErrors Json?
+  lastError        String?
+  appliedAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([changeSetId, proposedChangeId])
+  @@index([changeSetId, status])
+}
+
+enum AlertSeverity {
+  info
+  warning
+  critical
+}
+
+enum AlertStatus {
+  unread
+  read
+  resolved
+}
+
+model Alert {
+  id         String        @id @default(cuid())
+  shopId     String
+  shop       Shop          @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  supplierId String?
+  supplier   Supplier?     @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  feedRunId  String?
+  feedRun    FeedRun?      @relation(fields: [feedRunId], references: [id], onDelete: SetNull)
+  severity   AlertSeverity @default(info)
+  type       String
+  title      String
+  message    String
+  status     AlertStatus   @default(unread)
+  metadata   Json?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([shopId, status])
+  @@index([shopId, severity])
+}
+
+model AuditEvent {
+  id              String   @id @default(cuid())
+  shopId          String
+  shop            Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  actorType       String   // merchant | system | webhook
+  actorIdentifier String?
+  action          String
+  resourceType    String
+  resourceId      String?
+  summary         String
+  beforeData      Json?
+  afterData       Json?
+  ipHash          String?
+  createdAt       DateTime @default(now())
+
+  @@index([shopId, createdAt])
+  @@index([shopId, resourceType, resourceId])
+}
+
+model BillingEntitlement {
+  id                    String   @id @default(cuid())
+  shopId                String   @unique
+  shop                  Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  planCode              String   @default("free") // free | starter | growth | pro | beta
+  status                String   @default("active")
+  trialEndsAt           DateTime?
+  subscriptionReference String?
+  limits                Json     @default("{}")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model WebhookEvent {
+  id          String   @id @default(cuid())
+  webhookId   String   @unique
+  topic       String
+  shopDomain  String
+  receivedAt  DateTime @default(now())
+}
