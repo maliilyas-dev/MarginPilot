@@ -21,9 +21,18 @@ export async function requestCatalogSync(
 ): Promise<RequestCatalogSyncResult> {
   const active = await prisma.catalogSync.findFirst({
     where: { shopId: shop.id, status: { in: ["queued", "running"] } },
+    orderBy: { startedAt: "desc" },
   });
   if (active) {
-    return { ok: true, catalogSyncId: active.id, alreadyRunning: true };
+    // Recover from a sync that died without recording a terminal status.
+    const staleMs = Date.now() - new Date(active.startedAt).getTime();
+    if (staleMs < 15 * 60 * 1000) {
+      return { ok: true, catalogSyncId: active.id, alreadyRunning: true };
+    }
+    await prisma.catalogSync.update({
+      where: { id: active.id },
+      data: { status: "failed", completedAt: new Date(), errorSummary: "Timed out — superseded by a new sync." },
+    });
   }
 
   const cs = await prisma.catalogSync.create({ data: { shopId: shop.id, status: "queued" } });

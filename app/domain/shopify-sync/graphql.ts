@@ -24,7 +24,7 @@ export const SHOP_LOCATIONS_QUERY = /* GraphQL */ `
 /** Cursor-paginated catalog read. 50 products / 100 variants per page. */
 export const PRODUCTS_PAGE_QUERY = /* GraphQL */ `
   query MarginPilotProductsPage($cursor: String) {
-    products(first: 50, after: $cursor, sortKey: UPDATED_AT) {
+    products(first: 10, after: $cursor, sortKey: UPDATED_AT) {
       pageInfo {
         hasNextPage
         endCursor
@@ -37,7 +37,7 @@ export const PRODUCTS_PAGE_QUERY = /* GraphQL */ `
           productType
           status
           updatedAt
-          variants(first: 100) {
+          variants(first: 25) {
             pageInfo {
               hasNextPage
               endCursor
@@ -57,7 +57,7 @@ export const PRODUCTS_PAGE_QUERY = /* GraphQL */ `
                   unitCost {
                     amount
                   }
-                  inventoryLevels(first: 20) {
+                  inventoryLevels(first: 5) {
                     edges {
                       node {
                         location {
@@ -85,7 +85,7 @@ export const PRODUCT_VARIANTS_PAGE_QUERY = /* GraphQL */ `
   query MarginPilotProductVariantsPage($productId: ID!, $cursor: String) {
     product(id: $productId) {
       id
-      variants(first: 100, after: $cursor) {
+      variants(first: 40, after: $cursor) {
         pageInfo {
           hasNextPage
           endCursor
@@ -105,7 +105,7 @@ export const PRODUCT_VARIANTS_PAGE_QUERY = /* GraphQL */ `
               unitCost {
                 amount
               }
-              inventoryLevels(first: 20) {
+              inventoryLevels(first: 5) {
                 edges {
                   node {
                     location {

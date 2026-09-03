@@ -84,6 +84,9 @@ export interface CleanupJob {
 export async function enqueueCatalogSync(data: CatalogSyncJob) {
   return getQueue(QUEUE_NAMES.catalogSync).add("sync", data, {
     jobId: `catalog-sync-${data.catalogSyncId}`,
+    // A catalog sync failure is usually a permanent GraphQL/scope issue, not a
+    // transient one; don't hammer Shopify with 5 retries.
+    attempts: 2,
   });
 }
 export async function enqueueFeedFetch(data: FeedFetchJob) {

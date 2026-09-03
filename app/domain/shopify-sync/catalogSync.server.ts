@@ -78,6 +78,21 @@ export interface CatalogSyncDeps {
 }
 
 export async function runCatalogSync(deps: CatalogSyncDeps) {
+  try {
+    return await runCatalogSyncInner(deps);
+  } catch (err) {
+    const summary = err instanceof Error ? `${err.name}: ${err.message}`.slice(0, 500) : String(err).slice(0, 500);
+    await prisma.catalogSync
+      .update({
+        where: { id: deps.catalogSyncId },
+        data: { status: "failed", completedAt: new Date(), errorSummary: summary },
+      })
+      .catch(() => undefined);
+    throw err;
+  }
+}
+
+async function runCatalogSyncInner(deps: CatalogSyncDeps) {
   const log = logger.child({ scope: "catalog-sync", shopId: deps.shopId });
   const client = createAdminGraphqlClient({
     shopDomain: deps.shopDomain,
