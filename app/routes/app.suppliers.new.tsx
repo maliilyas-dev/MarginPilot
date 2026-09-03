@@ -29,14 +29,26 @@ const schema = z.object({
 });
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
   const shop = await requireShop(session);
-  const locations = await prisma.variantInventory.findMany({
-    where: { variant: { shopId: shop.id } },
-    distinct: ["locationGid"],
-    select: { locationGid: true },
-  });
-  return { defaultLocationGid: shop.defaultLocationGid, timezone: shop.timezone, locations: locations.map((l) => l.locationGid) };
+  let locations: Array<{ gid: string; name: string }> = [];
+  try {
+    const res = await admin.graphql(
+      `#graphql
+      query MarginPilotNewSupplierLocations {
+        locations(first: 50, includeInactive: false) { edges { node { id name } } }
+      }`,
+    );
+    const body = (await res.json()) as {
+      data?: { locations?: { edges?: Array<{ node?: { id?: string; name?: string } }> } };
+    };
+    locations = (body.data?.locations?.edges ?? [])
+      .map((e) => ({ gid: e.node?.id ?? "", name: e.node?.name ?? e.node?.id ?? "" }))
+      .filter((l) => l.gid);
+  } catch {
+    locations = [];
+  }
+  return { defaultLocationGid: shop.defaultLocationGid, timezone: shop.timezone, locations };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -253,8 +265,8 @@ export default function NewSupplier() {
             >
               <s-option value="">Use shop default</s-option>
               {locations.map((l) => (
-                <s-option key={l} value={l}>
-                  {l}
+                <s-option key={l.gid} value={l.gid}>
+                  {l.name}
                 </s-option>
               ))}
             </s-select>

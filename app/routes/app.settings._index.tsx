@@ -22,21 +22,39 @@ const schema = z.object({
 });
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
   const shop = await requireShop(session);
-  const [safety, locations, lastSync, variantCount] = await Promise.all([
+  const [safety, lastSync, variantCount] = await Promise.all([
     prisma.safetyPolicy.findUnique({ where: { shopId: shop.id } }),
-    prisma.variantInventory.findMany({
-      where: { variant: { shopId: shop.id } },
-      distinct: ["locationGid"],
-      select: { locationGid: true },
-    }),
     prisma.catalogSync.findFirst({ where: { shopId: shop.id }, orderBy: { startedAt: "desc" } }),
     prisma.shopifyVariant.count({ where: { shopId: shop.id, activeLocally: true } }),
   ]);
+
+  // List the shop's real Shopify locations directly (don't derive from synced
+  // inventory — a store can have locations with no stock).
+  let locations: Array<{ gid: string; name: string }> = [];
+  try {
+    const res = await admin.graphql(
+      `#graphql
+      query MarginPilotSettingsLocations {
+        locations(first: 50, includeInactive: false) {
+          edges { node { id name } }
+        }
+      }`,
+    );
+    const body = (await res.json()) as {
+      data?: { locations?: { edges?: Array<{ node?: { id?: string; name?: string } }> } };
+    };
+    locations = (body.data?.locations?.edges ?? [])
+      .map((e) => ({ gid: e.node?.id ?? "", name: e.node?.name ?? e.node?.id ?? "" }))
+      .filter((l) => l.gid);
+  } catch {
+    locations = [];
+  }
+
   return {
     shop: { defaultLocationGid: shop.defaultLocationGid, currencyCode: shop.currencyCode, timezone: shop.timezone },
-    locations: locations.map((l) => l.locationGid),
+    locations,
     safety: safety && {
       maxPriceDecreasePercent: Number(safety.maxPriceDecreasePercent),
       maxPriceIncreasePercent: Number(safety.maxPriceIncreasePercent),
@@ -130,8 +148,8 @@ export default function Settings() {
             >
               <s-option value="">Not set</s-option>
               {locations.map((l) => (
-                <s-option key={l} value={l}>
-                  {l}
+                <s-option key={l.gid} value={l.gid}>
+                  {l.name}
                 </s-option>
               ))}
             </s-select>
