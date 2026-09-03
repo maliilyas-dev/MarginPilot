@@ -5,7 +5,7 @@
 client_id = "f05f1392668f7e783075813eda565f20"
 name = "Margin Pilot"
 handle = "margin-pilot"
-application_url = "https://shopify.dev/apps/default-app-home"
+application_url = "https://marginpilot-production.up.railway.app"
 embedded = true
 
 [build]
@@ -17,9 +17,9 @@ scopes = "read_products,write_products,read_inventory,write_inventory,read_locat
 
 [auth]
 redirect_urls = [
-  "https://shopify.dev/apps/default-app-home/auth/callback",
-  "https://shopify.dev/apps/default-app-home/auth/shopify/callback",
-  "https://shopify.dev/apps/default-app-home/api/auth/callback"
+  "https://marginpilot-production.up.railway.app/auth/callback",
+  "https://marginpilot-production.up.railway.app/auth/shopify/callback",
+  "https://marginpilot-production.up.railway.app/api/auth/callback"
 ]
 
 # 2026-07 is the latest stable release supported by the installed
