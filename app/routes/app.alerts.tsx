@@ -3,6 +3,7 @@ import { useFetcher, useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop } from "../services/shopContext.server";
+import { EmptyState, severityBadge } from "../components/ui";
 import prisma from "../db.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -35,21 +36,24 @@ export default function Alerts() {
     <s-page heading="Alerts">
       <s-section>
         {alerts.length === 0 ? (
-          <s-paragraph>No alerts. You are all clear.</s-paragraph>
+          <EmptyState icon="check-circle" heading="No alerts">
+            You&apos;re all clear. MarginPilot raises an alert here when a feed fails, mapping drops, margins fall below
+            rule, or a Shopify update partially fails.
+          </EmptyState>
         ) : (
           <s-stack direction="block" gap="base">
             {alerts.map((a) => (
-              <s-box key={a.id} padding="base" borderWidth="base" borderRadius="base">
+              <s-box key={a.id} padding="base" borderWidth="base" borderRadius="base" background="base">
                 <s-stack direction="block" gap="small-300">
-                  <s-stack direction="inline" gap="base">
-                    <s-badge tone={a.severity === "critical" ? "critical" : a.severity === "warning" ? "warning" : "info"}>
-                      {a.severity}
+                  <s-stack direction="inline" gap="small-200" alignItems="center">
+                    {severityBadge(a.severity)}
+                    <s-badge tone={a.status === "resolved" ? "success" : a.status === "read" ? "neutral" : "info"}>
+                      {a.status}
                     </s-badge>
-                    <s-badge tone={a.status === "resolved" ? "success" : "neutral"}>{a.status}</s-badge>
-                    <s-text>{new Date(a.at).toLocaleString()}</s-text>
+                    <s-text color="subdued">{new Date(a.at).toLocaleString()}</s-text>
                   </s-stack>
                   <s-heading>{a.title}</s-heading>
-                  <s-text>{a.message}</s-text>
+                  <s-text color="subdued">{a.message}</s-text>
                   <s-stack direction="inline" gap="base">
                     {a.feedRunId && <s-link href={`/app/runs/${a.feedRunId}`}>Open run</s-link>}
                     {a.status !== "read" && a.status !== "resolved" && (

@@ -3,6 +3,7 @@ import { useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop } from "../services/shopContext.server";
+import { EmptyState, runStatusBadge, supplierStatusBadge } from "../components/ui";
 import prisma from "../db.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -46,12 +47,18 @@ export default function SuppliersIndex() {
   const { suppliers } = useLoaderData<typeof loader>();
   return (
     <s-page heading="Suppliers">
-      <s-button slot="primary-action" href="/app/suppliers/new">
+      <s-button slot="primary-action" href="/app/suppliers/new" variant="primary">
         Add supplier
       </s-button>
       <s-section>
         {suppliers.length === 0 ? (
-          <s-paragraph>No suppliers yet. Add one to import a supplier feed.</s-paragraph>
+          <EmptyState
+            icon="store"
+            heading="No suppliers yet"
+            action={{ label: "Add your first supplier", href: "/app/suppliers/new" }}
+          >
+            A supplier holds the feed connection, column mapping and pricing rules for one distributor or vendor.
+          </EmptyState>
         ) : (
           <s-table>
             <s-table-header-row>
@@ -61,24 +68,39 @@ export default function SuppliersIndex() {
               <s-table-header>Last run</s-table-header>
               <s-table-header>Mapped</s-table-header>
               <s-table-header>Status</s-table-header>
-              <s-table-header>Actions</s-table-header>
+              <s-table-header></s-table-header>
             </s-table-header-row>
             <s-table-body>
               {suppliers.map((s) => (
                 <s-table-row key={s.id}>
                   <s-table-cell>
-                    <s-link href={`/app/suppliers/${s.id}`}>{s.name}</s-link>
-                    <s-text> ({s.code})</s-text>
+                    <s-stack direction="block" gap="none">
+                      <s-link href={`/app/suppliers/${s.id}`}>{s.name}</s-link>
+                      <s-text color="subdued">{s.code}</s-text>
+                    </s-stack>
                   </s-table-cell>
-                  <s-table-cell>{s.feedType === "url_csv" ? "URL CSV" : "Manual CSV"}</s-table-cell>
+                  <s-table-cell>
+                    <s-badge icon={s.feedType === "url_csv" ? "link" : "upload"}>
+                      {s.feedType === "url_csv" ? "URL CSV" : "Manual CSV"}
+                    </s-badge>
+                  </s-table-cell>
                   <s-table-cell>{s.schedule.replace(/_/g, " ")}</s-table-cell>
                   <s-table-cell>
-                    {s.lastRunAt ? `${new Date(s.lastRunAt).toLocaleDateString()} — ${s.lastRunStatus ?? ""}` : "—"}
+                    {s.lastRunAt ? (
+                      <s-stack direction="inline" gap="small-200" alignItems="center">
+                        <s-text color="subdued">{new Date(s.lastRunAt).toLocaleDateString()}</s-text>
+                        {s.lastRunStatus ? runStatusBadge(s.lastRunStatus) : null}
+                      </s-stack>
+                    ) : (
+                      <s-text color="subdued">Never</s-text>
+                    )}
                   </s-table-cell>
-                  <s-table-cell>{s.mappedPercent}%</s-table-cell>
                   <s-table-cell>
-                    <s-badge tone={s.status === "active" ? "success" : "neutral"}>{s.status}</s-badge>
+                    <s-badge tone={s.mappedPercent >= 80 ? "success" : s.mappedPercent > 0 ? "caution" : "neutral"}>
+                      {s.mappedPercent}%
+                    </s-badge>
                   </s-table-cell>
+                  <s-table-cell>{supplierStatusBadge(s.status)}</s-table-cell>
                   <s-table-cell>
                     <s-link href={`/app/suppliers/${s.id}`}>Open</s-link>
                   </s-table-cell>

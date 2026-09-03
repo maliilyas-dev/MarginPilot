@@ -3,6 +3,7 @@ import { useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop, DEFAULT_ONBOARDING } from "../services/shopContext.server";
+import { ProgressMeter } from "../components/ui";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -26,12 +27,21 @@ export default function Onboarding() {
     <s-page heading="Get started with MarginPilot">
       <s-section heading="Setup checklist">
         <s-stack direction="block" gap="base">
-          {STEPS.map((s) => (
-            <s-stack key={s.key} direction="inline" gap="base">
-              <s-badge tone={state[s.key] ? "success" : "neutral"}>{state[s.key] ? "Done" : "To do"}</s-badge>
-              <s-link href={s.href}>{s.label}</s-link>
-            </s-stack>
-          ))}
+          <ProgressMeter done={STEPS.filter((s) => state[s.key]).length} total={STEPS.length} />
+          <s-divider />
+          <s-stack direction="block" gap="small-200">
+            {STEPS.map((s) => (
+              <s-stack key={s.key} direction="inline" gap="base" alignItems="center">
+                <s-badge
+                  tone={state[s.key] ? "success" : "neutral"}
+                  icon={state[s.key] ? "check-circle" : "circle"}
+                >
+                  {state[s.key] ? "Done" : "To do"}
+                </s-badge>
+                {state[s.key] ? <s-text>{s.label}</s-text> : <s-link href={s.href}>{s.label}</s-link>}
+              </s-stack>
+            ))}
+          </s-stack>
         </s-stack>
       </s-section>
       <s-section slot="aside" heading="How MarginPilot keeps you safe">

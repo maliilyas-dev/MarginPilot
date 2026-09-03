@@ -5,6 +5,7 @@ import { authenticate } from "../shopify.server";
 import { requireShop, requireFeedRun } from "../services/shopContext.server";
 import { recordAudit } from "../services/audit.server";
 import { describeReason, type ReasonCodeValue } from "../domain/safety/reasonCodes";
+import { StatCard, StatGrid, classificationBadge } from "../components/ui";
 import prisma from "../db.server";
 
 const FILTERS = ["all", "safe", "warning", "blocked", "unmatched", "invalid", "unchanged"] as const;
@@ -113,28 +114,67 @@ export default function Review() {
   const [sp] = useSearchParams();
   const override = useFetcher();
 
+  const CLASSES = ["safe", "warning", "blocked", "unmatched", "invalid", "unchanged"] as const;
+  const toneFor: Record<string, "success" | "warning" | "critical" | "neutral"> = {
+    safe: "success",
+    warning: "warning",
+    blocked: "critical",
+    unmatched: "neutral",
+    invalid: "critical",
+    unchanged: "neutral",
+  };
+
   return (
     <s-page heading="Review changes">
       <s-section>
         {data.run.blocked > 0 && (
-          <s-banner tone="warning">
-            {data.run.blocked} row(s) are blocked by a safety policy. Resolve the data or override a specific row before it
-            can be selected.
+          <s-banner tone="warning" heading={`${data.run.blocked} row(s) blocked by a safety policy`}>
+            <s-paragraph>
+              Blocked rows cannot be selected. Fix the supplier data and re-run, or override a specific row (logged, needs
+              confirmation).
+            </s-paragraph>
           </s-banner>
         )}
-        <s-stack direction="inline" gap="base">
+
+        <StatGrid>
+          {CLASSES.map((c) => (
+            <StatCard
+              key={c}
+              label={c[0].toUpperCase() + c.slice(1)}
+              value={data.counts[c] ?? 0}
+              tone={toneFor[c]}
+              href={`/app/runs/${data.run.id}/review?filter=${c}`}
+            />
+          ))}
+        </StatGrid>
+      </s-section>
+
+      <s-section heading="Financial exposure">
+        <s-stack direction="block" gap="small-200">
+          <span style={{ fontSize: "1.6rem", fontWeight: 650 }}>
+            {data.exposure.priceDelta >= 0 ? "+" : "−"}
+            {Math.abs(data.exposure.priceDelta).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </span>
+          <s-text color="subdued">
+            Total selling-price change across {data.exposure.affectedVariants} safe variant(s) if you approve all safe
+            rows.
+          </s-text>
+        </s-stack>
+      </s-section>
+
+      <s-section>
+        <s-stack direction="inline" gap="small-200">
           {FILTERS.map((f) => (
-            <s-link key={f} href={`/app/runs/${data.run.id}/review?filter=${f}`}>
+            <s-button
+              key={f}
+              href={`/app/runs/${data.run.id}/review?filter=${f}`}
+              variant={data.filter === f ? "primary" : "tertiary"}
+            >
               {f}
               {data.counts[f] !== undefined ? ` (${data.counts[f]})` : ""}
-            </s-link>
+            </s-button>
           ))}
         </s-stack>
-        <s-text>
-          Financial exposure if you apply all safe rows: {data.exposure.affectedVariants} variants, total price change{" "}
-          {data.exposure.priceDelta >= 0 ? "+" : ""}
-          {data.exposure.priceDelta}
-        </s-text>
       </s-section>
 
       <Form method="post" action={`/app/actions/runs/${data.run.id}/approve`}>
@@ -176,19 +216,7 @@ export default function Review() {
                     {r.landedCost ?? "—"} / {r.recommendedMarginPercent ? `${r.recommendedMarginPercent}%` : "—"}
                   </s-table-cell>
                   <s-table-cell>
-                    <s-badge
-                      tone={
-                        r.classification === "safe"
-                          ? "success"
-                          : r.classification === "warning"
-                            ? "warning"
-                            : r.classification === "blocked"
-                              ? "critical"
-                              : "neutral"
-                      }
-                    >
-                      {r.classification}
-                    </s-badge>
+                    {classificationBadge(r.classification)}
                     {r.classification === "blocked" && !r.overrideApproved && (
                       <override.Form method="post" action={`/app/runs/${data.run.id}/review${sp.toString() ? `?${sp}` : ""}`}>
                         <input type="hidden" name="intent" value="override" />
@@ -221,16 +249,20 @@ export default function Review() {
           )}
         </s-section>
 
-        <s-section heading="Approve">
-          <s-stack direction="block" gap="small-300">
-            <s-checkbox name="updatePrice" value="on" label="Update selling price" />
-            <s-checkbox name="updateInventory" value="on" label="Update inventory quantity" />
-            <s-checkbox name="updateUnitCost" value="on" label="Update unit cost (if authorized)" />
+        <s-section heading="Approve &amp; apply">
+          <s-stack direction="block" gap="base">
+            <s-banner tone="info">
+              <s-paragraph>
+                Approving creates an immutable change set and queues Shopify updates in the background. You can close this
+                tab — the job keeps running. Nothing is written to Shopify until you approve.
+              </s-paragraph>
+            </s-banner>
+            <s-stack direction="block" gap="small-300">
+              <s-checkbox name="updatePrice" value="on" label="Update selling price" />
+              <s-checkbox name="updateInventory" value="on" label="Update inventory quantity" />
+              <s-checkbox name="updateUnitCost" value="on" label="Update unit cost (if authorized)" />
+            </s-stack>
             <input type="hidden" name="confirm" value="yes" />
-            <s-text>
-              Approving creates an immutable change set and queues Shopify updates in the background. You can close this
-              tab; the job keeps running.
-            </s-text>
             <s-button type="submit" variant="primary" disabled={data.run.status !== "ready_for_review"}>
               Approve selected changes
             </s-button>
