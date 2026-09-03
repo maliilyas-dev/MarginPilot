@@ -16,11 +16,11 @@ import {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
-  const shop = await requireShop(session);
   try {
+    const shop = await requireShop(session);
     return { data: await getDashboardData(shop.id), error: null as string | null };
   } catch (err) {
-    console.error("[dashboard] getDashboardData failed", err);
+    console.error("[dashboard] loader failed", err);
     const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
     return { data: null, error: msg };
   }

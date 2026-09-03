@@ -32,11 +32,24 @@ export async function getDashboardData(shopId: string): Promise<DashboardData> {
       prisma.proposedChange.count({ where: { feedRun: { shopId, status: "ready_for_review" }, classification: "safe" } }),
     ]);
 
-  const belowFloor = await prisma.proposedChange.count({
-    where: { feedRun: { shopId, status: "ready_for_review" }, reasonCodes: { array_contains: ["MARGIN_BELOW_MINIMUM"] } as object },
-  }).catch(() => 0);
+  // Count proposed changes flagged MARGIN_BELOW_MINIMUM without relying on a
+  // JSON containment operator (portability + avoids engine quirks): pull the
+  // small set of reason-code arrays for pending runs and filter in JS.
+  let belowFloor = 0;
+  try {
+    const pendingReasons = await prisma.proposedChange.findMany({
+      where: { feedRun: { shopId, status: "ready_for_review" } },
+      select: { reasonCodes: true },
+    });
+    belowFloor = pendingReasons.filter((p) => {
+      const codes = Array.isArray(p.reasonCodes) ? (p.reasonCodes as unknown[]) : [];
+      return codes.includes("MARGIN_BELOW_MINIMUM");
+    }).length;
+  } catch {
+    belowFloor = 0;
+  }
 
-  const alerts = await unresolvedAlertCounts(shopId);
+  const alerts = await unresolvedAlertCounts(shopId).catch(() => ({ info: 0, warning: 0, critical: 0 }));
   const mappedPercent = totalMappings > 0 ? Math.round((mappedMatched / totalMappings) * 100) : 0;
 
   const onboardingComplete = Object.values(onboarding).every(Boolean);
