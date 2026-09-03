@@ -54,3 +54,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   return Response.json({ ok: true, feedRunId: run.id, redirectTo: `/app/runs/${run.id}` });
 };
+
+// Resource route: POST only. A loader is required so React Router single-fetch
+// routes fetcher submissions here instead of returning 400 Bad Request.
+export const loader = () => {
+  throw new Response("Method Not Allowed", { status: 405 });
+};

@@ -1,9 +1,10 @@
 import { useEffect } from "react";
-import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { useFetcher, useLoaderData, useRevalidator, useRouteError, isRouteErrorResponse } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop } from "../services/shopContext.server";
+import { requestCatalogSync } from "../services/catalogSyncRequest.server";
 import { getDashboardData } from "../domain/dashboard.server";
 import {
   EmptyState,
@@ -26,6 +27,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 };
 
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const { session } = await authenticate.admin(request);
+  const shop = await requireShop(session);
+  return Response.json(await requestCatalogSync(shop, session.shop));
+};
+
 const ONBOARDING_STEPS: Array<{ key: string; label: string; href: string }> = [
   { key: "selectedLocation", label: "Select default inventory location", href: "/app/settings" },
   { key: "catalogImported", label: "Import Shopify catalog", href: "/app/settings" },
@@ -37,7 +44,7 @@ const ONBOARDING_STEPS: Array<{ key: string; label: string; href: string }> = [
 
 export default function Home() {
   const { data, error } = useLoaderData<typeof loader>();
-  const sync = useFetcher<{ ok: boolean; alreadyRunning?: boolean }>();
+  const sync = useFetcher<{ ok: boolean; alreadyRunning?: boolean; message?: string }>();
   const revalidator = useRevalidator();
   const syncing = sync.state !== "idle";
 
@@ -195,7 +202,8 @@ export default function Home() {
               )}
             </s-text>
           </s-stack>
-          <sync.Form method="post" action="/app/actions/catalog-sync">
+          <sync.Form method="post">
+            <input type="hidden" name="intent" value="catalog-sync" />
             <s-button type="submit" {...(syncing ? { loading: true } : {})}>
               {syncing ? "Starting…" : "Sync catalog now"}
             </s-button>

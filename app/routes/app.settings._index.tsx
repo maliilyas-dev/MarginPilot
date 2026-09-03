@@ -5,11 +5,12 @@ import { z } from "zod";
 import { authenticate } from "../shopify.server";
 import { requireShop, markOnboarding } from "../services/shopContext.server";
 import { recordAudit } from "../services/audit.server";
+import { requestCatalogSync } from "../services/catalogSyncRequest.server";
 import { Callout, StatCard, StatGrid } from "../components/ui";
 import prisma from "../db.server";
 
 const schema = z.object({
-  intent: z.enum(["location", "safety"]),
+  intent: z.enum(["location", "safety", "catalog-sync"]),
   defaultLocationGid: z.string().optional(),
   maxPriceDecreasePercent: z.coerce.number().optional(),
   maxPriceIncreasePercent: z.coerce.number().optional(),
@@ -57,6 +58,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (!parsed.success) return { error: "Check the values." };
   const d = parsed.data;
 
+  if (d.intent === "catalog-sync") {
+    return Response.json(await requestCatalogSync(shop, session.shop));
+  }
+
   if (d.intent === "location") {
     await prisma.shop.update({ where: { id: shop.id }, data: { defaultLocationGid: d.defaultLocationGid || null } });
     await markOnboarding(shop.id, { selectedLocation: Boolean(d.defaultLocationGid) });
@@ -82,7 +87,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export default function Settings() {
   const { shop, locations, safety, lastSync, variantCount } = useLoaderData<typeof loader>();
-  const sync = useFetcher<{ ok: boolean; catalogSyncId?: string }>();
+  const sync = useFetcher<{ ok: boolean; catalogSyncId?: string; alreadyRunning?: boolean; message?: string }>();
 
   return (
     <s-page heading="Settings">
@@ -98,12 +103,18 @@ export default function Settings() {
               caption={lastSync ? new Date(lastSync.at).toLocaleString() : "Run a sync to get started"}
             />
           </StatGrid>
-          <sync.Form method="post" action="/app/actions/catalog-sync">
+          <sync.Form method="post">
+            <input type="hidden" name="intent" value="catalog-sync" />
             <s-button type="submit" variant="primary" {...(sync.state !== "idle" ? { loading: true } : {})}>
               Sync catalog now
             </s-button>
           </sync.Form>
-          {sync.data?.ok && <s-banner tone="success">Catalog sync queued. It runs in the background.</s-banner>}
+          {sync.data?.ok && (
+            <s-banner tone="success">
+              {sync.data.alreadyRunning ? "A sync is already running." : "Catalog sync queued — it runs in the background."}
+            </s-banner>
+          )}
+          {sync.data && !sync.data.ok && <s-banner tone="critical">{sync.data.message ?? "Could not start the sync."}</s-banner>}
         </s-stack>
       </s-section>
 

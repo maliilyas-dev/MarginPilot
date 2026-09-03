@@ -132,3 +132,9 @@ async function profileId(supplierId: string, fingerprint: string): Promise<strin
   const p = await prisma.feedMappingProfile.findFirst({ where: { supplierId, headerFingerprint: fingerprint } });
   return p?.id ?? null;
 }
+
+// Resource route: POST only. A loader is required so React Router single-fetch
+// routes fetcher submissions here instead of returning 400 Bad Request.
+export const loader = () => {
+  throw new Response("Method Not Allowed", { status: 405 });
+};
