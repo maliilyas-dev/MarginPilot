@@ -1,3 +1,11 @@
+.git
 .cache
 build
 node_modules
+.env
+.env.*
+.react-router
+coverage
+playwright-report
+test-results
+*.log
