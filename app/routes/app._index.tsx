@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { useFetcher, useLoaderData, useRevalidator } from "react-router";
+import { useFetcher, useLoaderData, useRevalidator, useRouteError, isRouteErrorResponse } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop } from "../services/shopContext.server";
@@ -61,9 +61,6 @@ export default function Home() {
           </s-paragraph>
           <s-button slot="primary-action" href={data.primaryCta.href}>
             {data.primaryCta.label}
-          </s-button>
-          <s-button slot="secondary-actions" href="/app/guide">
-            Guide me
           </s-button>
         </s-banner>
       )}
@@ -199,6 +196,31 @@ export default function Home() {
           <s-list-item>Bad costs, negative quantities and large swings are blocked, not applied.</s-list-item>
           <s-list-item>Every applied change is kept in an audit trail.</s-list-item>
         </s-unordered-list>
+      </s-section>
+    </s-page>
+  );
+}
+
+export function ErrorBoundary() {
+  const error = useRouteError();
+  const message = isRouteErrorResponse(error)
+    ? `${error.status} ${error.statusText}`
+    : error instanceof Error
+      ? error.message
+      : "Unknown error";
+  const stack = error instanceof Error ? error.stack : undefined;
+  return (
+    <s-page heading="MarginPilot">
+      <s-section heading="Something went wrong loading the dashboard">
+        <s-stack direction="block" gap="base">
+          <s-banner tone="critical">{message}</s-banner>
+          {stack ? (
+            <s-box padding="base" borderRadius="base" background="subdued">
+              <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 11 }}>{stack}</pre>
+            </s-box>
+          ) : null}
+          <s-link href="/app">Reload</s-link>
+        </s-stack>
       </s-section>
     </s-page>
   );
