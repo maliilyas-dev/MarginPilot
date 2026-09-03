@@ -17,7 +17,13 @@ import {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shop = await requireShop(session);
-  return { data: await getDashboardData(shop.id) };
+  try {
+    return { data: await getDashboardData(shop.id), error: null as string | null };
+  } catch (err) {
+    console.error("[dashboard] getDashboardData failed", err);
+    const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    return { data: null, error: msg };
+  }
 };
 
 const ONBOARDING_STEPS: Array<{ key: string; label: string; href: string }> = [
@@ -30,7 +36,21 @@ const ONBOARDING_STEPS: Array<{ key: string; label: string; href: string }> = [
 ];
 
 export default function Home() {
-  const { data } = useLoaderData<typeof loader>();
+  const { data, error } = useLoaderData<typeof loader>();
+
+  if (error || !data) {
+    return (
+      <s-page heading="MarginPilot">
+        <s-section heading="Dashboard couldn't load">
+          <s-stack direction="block" gap="base">
+            <s-banner tone="critical">{error ?? "No data"}</s-banner>
+            <s-link href="/app">Retry</s-link>
+          </s-stack>
+        </s-section>
+      </s-page>
+    );
+  }
+
   const onboarding = data.onboarding as Record<string, boolean>;
   const doneCount = ONBOARDING_STEPS.filter((s) => onboarding[s.key]).length;
 
