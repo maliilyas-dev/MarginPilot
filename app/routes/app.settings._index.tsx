@@ -110,8 +110,13 @@ export default function Settings() {
       <s-section heading="Default inventory location">
         <Form method="post">
           <input type="hidden" name="intent" value="location" />
-          <s-stack direction="block" gap="small-300">
-            <s-select label="Location" name="defaultLocationGid" value={shop.defaultLocationGid ?? ""}>
+          <s-stack direction="block" gap="base">
+            <s-select
+              label="Location"
+              name="defaultLocationGid"
+              value={shop.defaultLocationGid ?? ""}
+              details="Where MarginPilot writes inventory quantities. A supplier can override this. Locations appear here after a catalog sync."
+            >
               <s-option value="">Not set</s-option>
               {locations.map((l) => (
                 <s-option key={l} value={l}>
@@ -119,8 +124,12 @@ export default function Settings() {
                 </s-option>
               ))}
             </s-select>
-            <s-text>Currency: {shop.currencyCode} · Time zone: {shop.timezone}</s-text>
-            <s-button type="submit">Save location</s-button>
+            <s-text color="subdued">
+              Currency: {shop.currencyCode} · Time zone: {shop.timezone}
+            </s-text>
+            <s-button type="submit" variant="primary">
+              Save location
+            </s-button>
           </s-stack>
         </Form>
       </s-section>
@@ -132,15 +141,56 @@ export default function Settings() {
         </Callout>
         <Form method="post">
           <input type="hidden" name="intent" value="safety" />
-          <s-stack direction="block" gap="small-300">
-            <s-number-field label="Max price decrease %" name="maxPriceDecreasePercent" defaultValue={String(safety?.maxPriceDecreasePercent ?? 20)} />
-            <s-number-field label="Max price increase %" name="maxPriceIncreasePercent" defaultValue={String(safety?.maxPriceIncreasePercent ?? 50)} />
-            <s-number-field label="Max inventory change %" name="maxInventoryChangePercent" defaultValue={String(safety?.maxInventoryChangePercent ?? 90)} />
-            <s-number-field label="Max inventory absolute change" name="maxInventoryAbsoluteChange" defaultValue={String(safety?.maxInventoryAbsoluteChange ?? 1000)} />
-            <s-number-field label="Max invalid-row rate % (blocks run)" name="maxInvalidRowPercent" defaultValue={String(safety?.maxInvalidRowPercent ?? 10)} />
-            <s-number-field label="Max row-count drop % (needs confirm)" name="maxRowCountDecreasePercent" defaultValue={String(safety?.maxRowCountDecreasePercent ?? 50)} />
-            <s-checkbox name="allowZeroCost" value="on" label="Allow zero unit cost" {...(safety?.allowZeroCost ? { checked: true } : {})} />
-            <s-button type="submit">Save safety policy</s-button>
+          <s-stack direction="block" gap="base">
+            <s-text color="subdued">Per-row limits — a row past any of these is blocked.</s-text>
+            <s-number-field
+              label="Max price decrease %"
+              name="maxPriceDecreasePercent"
+              defaultValue={String(safety?.maxPriceDecreasePercent ?? 20)}
+              details="Block a row if the recommended price is more than this % below the current price."
+            />
+            <s-number-field
+              label="Max price increase %"
+              name="maxPriceIncreasePercent"
+              defaultValue={String(safety?.maxPriceIncreasePercent ?? 50)}
+              details="Block a row if the recommended price is more than this % above the current price."
+            />
+            <s-number-field
+              label="Max inventory change %"
+              name="maxInventoryChangePercent"
+              defaultValue={String(safety?.maxInventoryChangePercent ?? 90)}
+              details="Block a row if the quantity would move by more than this % of the current quantity."
+            />
+            <s-number-field
+              label="Max inventory change (absolute units)"
+              name="maxInventoryAbsoluteChange"
+              defaultValue={String(safety?.maxInventoryAbsoluteChange ?? 1000)}
+              details="Block a row if the quantity would move by more than this many units."
+            />
+            <s-divider />
+            <s-text color="subdued">Whole-run limits — these can stop an entire feed.</s-text>
+            <s-number-field
+              label="Max invalid-row rate %"
+              name="maxInvalidRowPercent"
+              defaultValue={String(safety?.maxInvalidRowPercent ?? 10)}
+              details="If more than this % of rows fail validation, the whole run is blocked."
+            />
+            <s-number-field
+              label="Max row-count drop %"
+              name="maxRowCountDecreasePercent"
+              defaultValue={String(safety?.maxRowCountDecreasePercent ?? 50)}
+              details="If this feed has this much fewer rows than the last successful run, it needs your confirmation."
+            />
+            <s-checkbox
+              name="allowZeroCost"
+              value="on"
+              label="Allow zero unit cost"
+              details="Off by default — a $0 cost is usually a feed error and is blocked."
+              {...(safety?.allowZeroCost ? { checked: true } : {})}
+            />
+            <s-button type="submit" variant="primary">
+              Save safety policy
+            </s-button>
           </s-stack>
         </Form>
       </s-section>

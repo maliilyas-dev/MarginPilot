@@ -151,12 +151,24 @@ export default function Rules() {
         )}
       </s-section>
 
-      <s-section heading="Add a rule">
-        <Form method="post">
-          <input type="hidden" name="intent" value="create" />
-          <s-stack direction="block" gap="small-300">
-            <s-text-field label="Rule name" name="name" required />
-            <s-select label="Supplier" name="supplierId" value="">
+      <Form method="post">
+        <input type="hidden" name="intent" value="create" />
+
+        <s-section heading="New rule — scope">
+          <s-stack direction="block" gap="base">
+            <s-text-field
+              label="Rule name"
+              name="name"
+              placeholder="e.g. Auto parts — 40% floor"
+              details="Just a label so you recognise it in the list."
+              required
+            />
+            <s-select
+              label="Applies to"
+              name="supplierId"
+              value=""
+              details="A supplier-specific rule beats a shop-wide one at the same priority."
+            >
               <s-option value="">All suppliers (shop-wide)</s-option>
               {suppliers.map((s) => (
                 <s-option key={s.id} value={s.id}>
@@ -164,28 +176,112 @@ export default function Rules() {
                 </s-option>
               ))}
             </s-select>
-            <s-number-field label="Apply priority (lower wins)" name="priority" defaultValue="100" />
-            <s-text-field label="Shopify vendor filter (optional)" name="vendorFilter" />
-            <s-text-field label="Shopify product type filter (optional)" name="productTypeFilter" />
-            <s-number-field label="Minimum gross margin percent" name="minimumMarginPercent" defaultValue="0" />
-            <s-number-field label="Markup percent" name="markupPercent" defaultValue="0" />
-            <s-number-field label="Fixed handling cost per unit" name="fixedHandlingPerUnit" defaultValue="0" />
-            <s-number-field label="Duty percent" name="dutyPercent" defaultValue="0" />
-            <s-number-field label="Other cost percent" name="otherCostPercent" defaultValue="0" />
-            <s-select label="Price rounding rule" name="roundingRule" value="none">
-              <s-option value="none">None</s-option>
+            <s-number-field
+              label="Priority"
+              name="priority"
+              defaultValue="100"
+              details="Lower number wins when more than one rule could apply."
+            />
+            <s-text-field
+              label="Only products from this Shopify vendor"
+              name="vendorFilter"
+              placeholder="optional"
+              details="Leave blank to apply regardless of vendor."
+            />
+            <s-text-field
+              label="Only this Shopify product type"
+              name="productTypeFilter"
+              placeholder="optional"
+            />
+          </s-stack>
+        </s-section>
+
+        <s-section heading="Extra costs to fold into landed cost">
+          <s-stack direction="block" gap="base">
+            <s-number-field
+              label="Fixed handling cost per unit"
+              name="fixedHandlingPerUnit"
+              defaultValue="0"
+              details="A flat amount added to every unit (your currency)."
+            />
+            <s-number-field
+              label="Duty %"
+              name="dutyPercent"
+              defaultValue="0"
+              details="Percentage of supplier unit cost added as import duty."
+            />
+            <s-number-field
+              label="Other cost %"
+              name="otherCostPercent"
+              defaultValue="0"
+              details="Any other percentage-based cost (insurance, broker fees…)."
+            />
+          </s-stack>
+        </s-section>
+
+        <s-section heading="Margin &amp; markup">
+          <s-stack direction="block" gap="base">
+            <s-number-field
+              label="Minimum gross margin %"
+              name="minimumMarginPercent"
+              defaultValue="0"
+              details="The recommended price will never sit below this margin on landed cost. Must be under 100."
+            />
+            <s-number-field
+              label="Markup %"
+              name="markupPercent"
+              defaultValue="0"
+              details="Recommended price is the higher of the minimum-margin price and (landed cost + this markup)."
+            />
+          </s-stack>
+        </s-section>
+
+        <s-section heading="Rounding &amp; guard rails">
+          <s-stack direction="block" gap="base">
+            <s-select label="Round the recommended price" name="roundingRule" value="none">
+              <s-option value="none">Do not round</s-option>
               <s-option value="whole">Nearest whole amount</s-option>
               <s-option value="end_99">End in .99</s-option>
               <s-option value="end_95">End in .95</s-option>
               <s-option value="end_97">End in .97</s-option>
             </s-select>
-            <s-text-field label="Minimum permitted price (optional)" name="minimumPrice" />
-            <s-text-field label="Maximum permitted price (optional)" name="maximumPrice" />
+            <s-text-field
+              label="Never price below"
+              name="minimumPrice"
+              placeholder="optional"
+              details="A hard floor applied after rounding."
+            />
+            <s-text-field
+              label="Never price above"
+              name="maximumPrice"
+              placeholder="optional"
+              details="A hard ceiling applied after rounding."
+            />
             <s-button type="submit" variant="primary">
               Add rule
             </s-button>
           </s-stack>
-        </Form>
+        </s-section>
+      </Form>
+
+      <s-section slot="aside" heading="Worked example">
+        <s-box padding="base" borderRadius="base" background="subdued">
+          <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.6 }}>
+{`supplier unit cost   10.00
++ freight (per row)   1.00
++ handling            0.50
++ duty 5%             0.50
+= landed cost        12.00
+
+min margin 40%  -> 12.00 / (1 - .40) = 20.00
+markup 30%      -> 12.00 x 1.30       = 15.60
+recommended     -> max(20.00, 15.60)  = 20.00
+round .99       -> 20.99  (then min/max clamp)`}
+          </pre>
+        </s-box>
+        <s-text color="subdued">
+          Freight is read per row from the feed if you mapped that column; everything else comes from the rule.
+        </s-text>
       </s-section>
     </s-page>
   );

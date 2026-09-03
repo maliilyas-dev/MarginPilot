@@ -130,20 +130,49 @@ export default function EditSupplier() {
 
         <s-section heading="Schedule &amp; matching">
           <s-stack direction="block" gap="base">
-            <s-select label="Schedule" name="schedule" value={supplier.schedule}>
-              <s-option value="manual">Manual</s-option>
+            <s-select
+              label="Run schedule"
+              name="schedule"
+              value={supplier.schedule}
+              details="You still approve every change set, whatever the schedule."
+            >
+              <s-option value="manual">Manual — only when I trigger it</s-option>
               <s-option value="daily">Daily</s-option>
               <s-option value="every_6_hours">Every 6 hours</s-option>
               <s-option value="hourly">Hourly</s-option>
             </s-select>
-            <s-text-field label="Time zone" name="timezone" defaultValue={supplier.timezone} />
-            <s-checkbox name="barcodeMatching" value="on" label="Also match by barcode" {...(supplier.barcodeMatching ? { checked: true } : {})} />
+            <s-text-field
+              label="Time zone"
+              name="timezone"
+              defaultValue={supplier.timezone}
+              details="Used to interpret the schedule. Timestamps are stored in UTC."
+            />
+            <s-checkbox
+              name="barcodeMatching"
+              value="on"
+              label="Also match by barcode when the SKU doesn't match"
+              details="Exact SKU is always tried first. Never matches on product title."
+              {...(supplier.barcodeMatching ? { checked: true } : {})}
+            />
             <s-button type="submit" variant="primary">
               Save changes
             </s-button>
           </s-stack>
         </s-section>
       </Form>
+
+      <s-section slot="aside" heading="Good to know">
+        <s-stack direction="block" gap="small-300">
+          <s-text color="subdued">
+            Changing the CSV format or column mapping only affects the <s-text type="strong">next</s-text> run — past
+            runs keep the settings they were processed with.
+          </s-text>
+          <s-text color="subdued">
+            Setting the status to <s-text type="strong">Inactive</s-text> pauses schedules but keeps all mappings and
+            history.
+          </s-text>
+        </s-stack>
+      </s-section>
     </s-page>
   );
 }

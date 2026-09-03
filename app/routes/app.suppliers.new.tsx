@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { Form, redirect, useActionData, useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -103,6 +104,8 @@ export default function NewSupplier() {
   const { locations, timezone } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const errors = (actionData?.errors ?? {}) as Record<string, string[]>;
+  const [feedType, setFeedType] = useState<"upload_csv" | "url_csv">("upload_csv");
+  const isUrl = feedType === "url_csv";
 
   return (
     <s-page heading="Add supplier">
@@ -117,11 +120,19 @@ export default function NewSupplier() {
       <Form method="post">
         <s-section heading="Identity">
           <s-stack direction="block" gap="base">
-            <s-text-field label="Supplier name" name="name" required error={errors.name?.[0]} />
             <s-text-field
-              label="Supplier code / short name"
+              label="Supplier name"
+              name="name"
+              placeholder="e.g. Acme Auto Parts Distribution"
+              details="Shown throughout MarginPilot. Use the name you recognise the supplier by."
+              required
+              error={errors.name?.[0]}
+            />
+            <s-text-field
+              label="Supplier code"
               name="code"
-              details="Letters, numbers, dashes. Used to identify feeds and must be unique."
+              placeholder="e.g. acme-auto"
+              details="A short unique handle (letters, numbers, dashes). Used in run history and exports. You can't change it later."
               required
               error={errors.code?.[0]}
             />
@@ -130,53 +141,116 @@ export default function NewSupplier() {
 
         <s-section heading="Feed source">
           <s-stack direction="block" gap="base">
-            <Callout tone="info" icon="lightbulb">
-              Choose <s-text type="strong">Manual CSV</s-text> to upload files yourself, or{" "}
-              <s-text type="strong">Scheduled URL CSV</s-text> to have MarginPilot fetch from a URL on a schedule. URL
-              feeds are SSRF-protected: private networks, oversized responses and long redirects are refused.
-            </Callout>
-            <s-select label="Feed type" name="feedType" value="upload_csv">
-              <s-option value="upload_csv">Manual CSV upload</s-option>
-              <s-option value="url_csv">Scheduled URL CSV</s-option>
+            <s-select
+              label="How does this supplier's data arrive?"
+              name="feedType"
+              value={feedType}
+              onChange={(e) => setFeedType((e.target as HTMLSelectElement).value as "upload_csv" | "url_csv")}
+            >
+              <s-option value="upload_csv">I will upload a CSV file each time</s-option>
+              <s-option value="url_csv">Fetch a CSV from a URL on a schedule</s-option>
             </s-select>
-            <s-text-field label="Feed URL (URL sources only)" name="feedUrl" error={errors.feedUrl?.[0]} />
-            <s-text-field label="HTTP Basic username (optional)" name="basicUser" />
-            <s-password-field
-              label="HTTP Basic password (optional)"
-              name="basicPass"
-              details="Stored encrypted (AES-256-GCM). Never shown again after saving."
-            />
+
+            {isUrl ? (
+              <>
+                <Callout tone="info" icon="shield-check-mark" title="URL feeds are fetched safely">
+                  MarginPilot refuses private/loopback addresses, limits redirects and response size, and times out — so
+                  a bad or malicious URL can&apos;t reach your internal network. You can test the connection from the
+                  supplier page before the first real run.
+                </Callout>
+                <s-text-field
+                  label="Feed URL"
+                  name="feedUrl"
+                  placeholder="https://supplier.example.com/exports/stock.csv"
+                  details="Direct link to a CSV. Google Sheets 'publish to web → CSV' links work too."
+                  error={errors.feedUrl?.[0]}
+                />
+                <s-text-field
+                  label="HTTP Basic username"
+                  name="basicUser"
+                  details="Only if the URL is password-protected. Leave blank otherwise."
+                />
+                <s-password-field
+                  label="HTTP Basic password"
+                  name="basicPass"
+                  details="Stored encrypted (AES-256-GCM) and never shown again after saving."
+                />
+              </>
+            ) : (
+              <Callout tone="info" icon="upload" title="Manual upload">
+                You&apos;ll drop a CSV onto the supplier page whenever you want to sync. Nothing is fetched automatically.
+                You can switch this supplier to a scheduled URL later.
+              </Callout>
+            )}
           </s-stack>
         </s-section>
 
         <s-section heading="CSV format">
           <s-stack direction="block" gap="base">
-            <s-select label="Delimiter" name="delimiter" value="auto">
-              <s-option value="auto">Auto-detect</s-option>
-              <s-option value="comma">Comma</s-option>
-              <s-option value="semicolon">Semicolon</s-option>
+            <s-text color="subdued">
+              Only change these if your supplier&apos;s file isn&apos;t a standard comma-separated, dot-decimal CSV.
+              Auto-detect handles most files.
+            </s-text>
+            <s-select label="Column delimiter" name="delimiter" value="auto">
+              <s-option value="auto">Auto-detect (recommended)</s-option>
+              <s-option value="comma">Comma ,</s-option>
+              <s-option value="semicolon">Semicolon ;</s-option>
               <s-option value="tab">Tab</s-option>
-              <s-option value="pipe">Pipe</s-option>
+              <s-option value="pipe">Pipe |</s-option>
             </s-select>
-            <s-select label="Decimal separator" name="decimalSeparator" value="dot">
-              <s-option value="dot">Dot (1,234.56)</s-option>
-              <s-option value="comma">Comma (1.234,56)</s-option>
+            <s-select
+              label="Decimal separator"
+              name="decimalSeparator"
+              value="dot"
+              details="How the supplier writes decimals in prices and costs."
+            >
+              <s-option value="dot">Dot — 1,234.56</s-option>
+              <s-option value="comma">Comma — 1.234,56</s-option>
             </s-select>
-            <s-text-field label="Thousands separator (optional)" name="thousandsSeparator" />
-            <s-text-field label="Currency code" name="currencyCode" details="Display only in Release 1" />
+            <s-text-field
+              label="Thousands separator"
+              name="thousandsSeparator"
+              placeholder="usually blank"
+              details="Leave blank unless the supplier groups thousands with an unusual character."
+            />
+            <s-text-field
+              label="Currency code"
+              name="currencyCode"
+              placeholder="USD"
+              details="Display only in this release — MarginPilot does not convert currencies."
+            />
           </s-stack>
         </s-section>
 
         <s-section heading="Schedule &amp; location">
           <s-stack direction="block" gap="base">
-            <s-select label="Schedule" name="schedule" value="manual" error={errors.schedule?.[0]}>
-              <s-option value="manual">Manual</s-option>
+            <s-select
+              label="Run schedule"
+              name="schedule"
+              value="manual"
+              details={
+                isUrl
+                  ? "How often to fetch and process the URL. You still approve every change set."
+                  : "Leave on Manual for uploaded files."
+              }
+              error={errors.schedule?.[0]}
+            >
+              <s-option value="manual">Manual — only when I trigger it</s-option>
               <s-option value="daily">Daily</s-option>
               <s-option value="every_6_hours">Every 6 hours</s-option>
               <s-option value="hourly">Hourly</s-option>
             </s-select>
-            <s-text-field label="Time zone" name="timezone" defaultValue={timezone} />
-            <s-select label="Default Shopify location" name="defaultLocationGid">
+            <s-text-field
+              label="Time zone"
+              name="timezone"
+              defaultValue={timezone}
+              details="Used to interpret the schedule. Timestamps are always stored in UTC."
+            />
+            <s-select
+              label="Shopify location for inventory writes"
+              name="defaultLocationGid"
+              details="Where this supplier's stock levels are applied. Defaults to your shop-wide setting."
+            >
               <s-option value="">Use shop default</s-option>
               {locations.map((l) => (
                 <s-option key={l} value={l}>
@@ -187,15 +261,33 @@ export default function NewSupplier() {
           </s-stack>
         </s-section>
 
-        <s-section heading="Matching">
+        <s-section heading="SKU matching">
           <s-stack direction="block" gap="base">
-            <s-checkbox name="barcodeMatching" value="on" label="Also match by barcode when the SKU does not match" />
+            <s-checkbox
+              name="barcodeMatching"
+              value="on"
+              label="Also match by barcode when the SKU doesn't match"
+              details="MarginPilot always tries exact SKU first. Enable this to fall back to an exact barcode match. It never matches on product title."
+            />
             <s-button type="submit" variant="primary">
               Create supplier
             </s-button>
           </s-stack>
         </s-section>
       </Form>
+
+      <s-section slot="aside" heading="What happens next">
+        <s-stack direction="block" gap="small-300">
+          <s-text color="subdued">After you create the supplier you&apos;ll:</s-text>
+          <s-ordered-list>
+            <s-list-item>Upload a CSV (or test the URL) on the supplier page.</s-list-item>
+            <s-list-item>Map its columns to supplier SKU, quantity and unit cost — saved after the first time.</s-list-item>
+            <s-list-item>Review matches, then a safe change preview.</s-list-item>
+            <s-list-item>Approve exactly what you want applied to Shopify.</s-list-item>
+          </s-ordered-list>
+          <s-link href="/app/guide">Open the full guide</s-link>
+        </s-stack>
+      </s-section>
     </s-page>
   );
 }

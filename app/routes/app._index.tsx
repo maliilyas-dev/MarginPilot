@@ -56,10 +56,14 @@ export default function Home() {
       {!data.onboardingComplete && (
         <s-banner tone="info" heading="Finish setup to run your first safe sync">
           <s-paragraph>
-            {doneCount} of {ONBOARDING_STEPS.length} steps complete. Next: {data.primaryCta.label.toLowerCase()}.
+            {doneCount} of {ONBOARDING_STEPS.length} steps complete. Next: {data.primaryCta.label.toLowerCase()}. New to
+            MarginPilot? <s-link href="/app/guide">Read the guide</s-link>.
           </s-paragraph>
           <s-button slot="primary-action" href={data.primaryCta.href}>
             {data.primaryCta.label}
+          </s-button>
+          <s-button slot="secondary-actions" href="/app/guide">
+            Guide me
           </s-button>
         </s-banner>
       )}
