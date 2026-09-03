@@ -528,6 +528,16 @@ model BillingEntitlement {
   updatedAt             DateTime  @updatedAt
 }
 
+/// Transient storage of an uploaded CSV so the worker (separate process) can
+/// read it. Deleted once the run reaches ready_for_review and by retention.
+model FeedUpload {
+  id        String   @id @default(cuid())
+  feedRunId String   @unique
+  filename  String
+  bytes     Bytes
+  createdAt DateTime @default(now())
+}
+
 model WebhookEvent {
   id         String   @id @default(cuid())
   webhookId  String   @unique

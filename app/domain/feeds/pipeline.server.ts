@@ -63,6 +63,10 @@ export async function runFeedPipeline(deps: RunPipelineDeps) {
     await prisma.feedRun.update({ where: { id: run.id }, data: { status: "fetching", startedAt: new Date() } });
     if (deps.uploadBuffer) {
       sourceBytes = deps.uploadBuffer;
+    } else if (supplier.feedType === "upload_csv") {
+      const upload = await prisma.feedUpload.findUnique({ where: { feedRunId: run.id } });
+      if (!upload) throw new Error("No uploaded file is attached to this run.");
+      sourceBytes = Buffer.from(upload.bytes);
     } else {
       if (!supplier.feedUrl) throw new Error("Supplier has no feed URL");
       const creds = decryptCredentials(supplier.encryptedCredentials);
@@ -395,6 +399,9 @@ export async function runFeedPipeline(deps: RunPipelineDeps) {
       completedAt: null,
     },
   });
+
+  // Drop the transient uploaded bytes now that rows are persisted.
+  await prisma.feedUpload.deleteMany({ where: { feedRunId: run.id } });
 
   // Alerts (spec 5.11)
   const mappingRate = normalizedRows.length > 0 ? matchedCount / normalizedRows.length : 1;

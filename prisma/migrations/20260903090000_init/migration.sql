@@ -410,6 +410,17 @@ CREATE TABLE "BillingEntitlement" (
 );
 
 -- CreateTable
+CREATE TABLE "FeedUpload" (
+    "id" TEXT NOT NULL,
+    "feedRunId" TEXT NOT NULL,
+    "filename" TEXT NOT NULL,
+    "bytes" BYTEA NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "FeedUpload_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "WebhookEvent" (
     "id" TEXT NOT NULL,
     "webhookId" TEXT NOT NULL,
@@ -518,6 +529,9 @@ CREATE INDEX "AuditEvent_shopId_resourceType_resourceId_idx" ON "AuditEvent"("sh
 
 -- CreateIndex
 CREATE UNIQUE INDEX "BillingEntitlement_shopId_key" ON "BillingEntitlement"("shopId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "FeedUpload_feedRunId_key" ON "FeedUpload"("feedRunId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "WebhookEvent_webhookId_key" ON "WebhookEvent"("webhookId");

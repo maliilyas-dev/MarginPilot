@@ -1,0 +1,244 @@
+import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
+import { Form, useFetcher, useLoaderData, useSearchParams } from "react-router";
+import { boundary } from "@shopify/shopify-app-react-router/server";
+import { authenticate } from "../shopify.server";
+import { requireShop, requireFeedRun } from "../services/shopContext.server";
+import { recordAudit } from "../services/audit.server";
+import { describeReason, type ReasonCodeValue } from "../domain/safety/reasonCodes";
+import prisma from "../db.server";
+
+const FILTERS = ["all", "safe", "warning", "blocked", "unmatched", "invalid", "unchanged"] as const;
+type Filter = (typeof FILTERS)[number];
+const PAGE_SIZE = 100;
+
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  const { session } = await authenticate.admin(request);
+  const shop = await requireShop(session);
+  const run = await requireFeedRun(shop.id, params.runId!);
+
+  const url = new URL(request.url);
+  const filter = (url.searchParams.get("filter") as Filter) || "all";
+  const page = Math.max(1, Number(url.searchParams.get("page") || 1));
+
+  const where = {
+    feedRunId: run.id,
+    ...(filter !== "all" ? { classification: filter } : {}),
+  };
+
+  const [rows, total, groupCounts] = await Promise.all([
+    prisma.proposedChange.findMany({
+      where,
+      include: { feedRow: true, variant: { include: { product: true } } },
+      orderBy: { feedRow: { rowNumber: "asc" } },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    prisma.proposedChange.count({ where }),
+    prisma.proposedChange.groupBy({ by: ["classification"], where: { feedRunId: run.id }, _count: { _all: true } }),
+  ]);
+
+  const counts: Record<string, number> = {};
+  for (const g of groupCounts) counts[g.classification] = g._count._all;
+
+  // Financial exposure summary (spec 5.7)
+  const safeRows = await prisma.proposedChange.findMany({
+    where: { feedRunId: run.id, classification: "safe" },
+    select: { currentPrice: true, recommendedPrice: true },
+  });
+  let priceDelta = 0;
+  for (const r of safeRows) {
+    if (r.currentPrice && r.recommendedPrice) priceDelta += Number(r.recommendedPrice) - Number(r.currentPrice);
+  }
+
+  return {
+    run: { id: run.id, status: run.status, blocked: run.blockedCount },
+    filter,
+    page,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+    counts,
+    exposure: { affectedVariants: safeRows.length, priceDelta: Number(priceDelta.toFixed(2)) },
+    rows: rows.map((r) => ({
+      id: r.id,
+      row: r.feedRow.rowNumber,
+      sku: r.feedRow.supplierSkuOriginal,
+      variant: r.variant ? `${r.variant.product.title} — ${r.variant.skuOriginal ?? ""}` : null,
+      classification: r.classification,
+      currentQuantity: r.currentQuantity,
+      proposedQuantity: r.proposedQuantity,
+      currentPrice: r.currentPrice ? r.currentPrice.toString() : null,
+      recommendedPrice: r.recommendedPrice ? r.recommendedPrice.toString() : null,
+      landedCost: r.landedCost ? r.landedCost.toString() : null,
+      recommendedMarginPercent: r.recommendedMarginPercent ? Number(r.recommendedMarginPercent).toFixed(1) : null,
+      reasons: (r.reasonCodes as ReasonCodeValue[]).map(describeReason),
+      overrideApproved: r.overrideApproved,
+      selectable: r.classification === "safe" || (r.classification === "blocked" && r.overrideApproved),
+    })),
+  };
+};
+
+export const action = async ({ request, params }: ActionFunctionArgs) => {
+  const { session } = await authenticate.admin(request);
+  const shop = await requireShop(session);
+  const run = await requireFeedRun(shop.id, params.runId!);
+  const form = await request.formData();
+  const intent = form.get("intent");
+
+  if (intent === "override") {
+    const id = String(form.get("proposedChangeId"));
+    if (form.get("confirm") !== "yes") {
+      return Response.json({ ok: false, message: "Override requires confirmation." }, { status: 400 });
+    }
+    const pc = await prisma.proposedChange.findFirst({ where: { id, feedRunId: run.id } });
+    if (!pc) return Response.json({ ok: false }, { status: 404 });
+    await prisma.proposedChange.update({ where: { id }, data: { overrideApproved: true } });
+    await recordAudit({
+      shopId: shop.id,
+      actorType: "merchant",
+      actorIdentifier: session.shop,
+      action: "safety_override",
+      resourceType: "proposed_change",
+      resourceId: id,
+      summary: `Overrode a blocked row (run ${run.id}).`,
+      beforeData: { reasonCodes: pc.reasonCodes },
+    });
+    return Response.json({ ok: true });
+  }
+
+  return Response.json({ ok: false, message: "Unknown action." }, { status: 400 });
+};
+
+export default function Review() {
+  const data = useLoaderData<typeof loader>();
+  const [sp] = useSearchParams();
+  const override = useFetcher();
+
+  return (
+    <s-page heading="Review changes">
+      <s-section>
+        {data.run.blocked > 0 && (
+          <s-banner tone="warning">
+            {data.run.blocked} row(s) are blocked by a safety policy. Resolve the data or override a specific row before it
+            can be selected.
+          </s-banner>
+        )}
+        <s-stack direction="inline" gap="base">
+          {FILTERS.map((f) => (
+            <s-link key={f} href={`/app/runs/${data.run.id}/review?filter=${f}`}>
+              {f}
+              {data.counts[f] !== undefined ? ` (${data.counts[f]})` : ""}
+            </s-link>
+          ))}
+        </s-stack>
+        <s-text>
+          Financial exposure if you apply all safe rows: {data.exposure.affectedVariants} variants, total price change{" "}
+          {data.exposure.priceDelta >= 0 ? "+" : ""}
+          {data.exposure.priceDelta}
+        </s-text>
+      </s-section>
+
+      <Form method="post" action={`/app/actions/runs/${data.run.id}/approve`}>
+        <s-section>
+          <s-table>
+            <s-table-header-row>
+              <s-table-header>Pick</s-table-header>
+              <s-table-header>Row</s-table-header>
+              <s-table-header>Supplier SKU</s-table-header>
+              <s-table-header>Shopify variant</s-table-header>
+              <s-table-header>Inv before → after</s-table-header>
+              <s-table-header>Price before → recommended</s-table-header>
+              <s-table-header>Landed / margin</s-table-header>
+              <s-table-header>Status</s-table-header>
+              <s-table-header>Reasons</s-table-header>
+            </s-table-header-row>
+            <s-table-body>
+              {data.rows.map((r) => (
+                <s-table-row key={r.id}>
+                  <s-table-cell>
+                    <input
+                      type="checkbox"
+                      name="proposedChangeId"
+                      value={r.id}
+                      disabled={!r.selectable}
+                      defaultChecked={r.classification === "safe"}
+                    />
+                  </s-table-cell>
+                  <s-table-cell>{r.row}</s-table-cell>
+                  <s-table-cell>{r.sku}</s-table-cell>
+                  <s-table-cell>{r.variant ?? "—"}</s-table-cell>
+                  <s-table-cell>
+                    {r.currentQuantity ?? "—"} → {r.proposedQuantity ?? "—"}
+                  </s-table-cell>
+                  <s-table-cell>
+                    {r.currentPrice ?? "—"} → {r.recommendedPrice ?? "—"}
+                  </s-table-cell>
+                  <s-table-cell>
+                    {r.landedCost ?? "—"} / {r.recommendedMarginPercent ? `${r.recommendedMarginPercent}%` : "—"}
+                  </s-table-cell>
+                  <s-table-cell>
+                    <s-badge
+                      tone={
+                        r.classification === "safe"
+                          ? "success"
+                          : r.classification === "warning"
+                            ? "warning"
+                            : r.classification === "blocked"
+                              ? "critical"
+                              : "neutral"
+                      }
+                    >
+                      {r.classification}
+                    </s-badge>
+                    {r.classification === "blocked" && !r.overrideApproved && (
+                      <override.Form method="post" action={`/app/runs/${data.run.id}/review${sp.toString() ? `?${sp}` : ""}`}>
+                        <input type="hidden" name="intent" value="override" />
+                        <input type="hidden" name="proposedChangeId" value={r.id} />
+                        <input type="hidden" name="confirm" value="yes" />
+                        <s-button type="submit" variant="tertiary">
+                          Override
+                        </s-button>
+                      </override.Form>
+                    )}
+                  </s-table-cell>
+                  <s-table-cell>{r.reasons.join("; ")}</s-table-cell>
+                </s-table-row>
+              ))}
+            </s-table-body>
+          </s-table>
+
+          {data.totalPages > 1 && (
+            <s-stack direction="inline" gap="base">
+              {data.page > 1 && (
+                <s-link href={`/app/runs/${data.run.id}/review?filter=${data.filter}&page=${data.page - 1}`}>Previous</s-link>
+              )}
+              <s-text>
+                Page {data.page} of {data.totalPages}
+              </s-text>
+              {data.page < data.totalPages && (
+                <s-link href={`/app/runs/${data.run.id}/review?filter=${data.filter}&page=${data.page + 1}`}>Next</s-link>
+              )}
+            </s-stack>
+          )}
+        </s-section>
+
+        <s-section heading="Approve">
+          <s-stack direction="block" gap="small-300">
+            <s-checkbox name="updatePrice" value="on" label="Update selling price" />
+            <s-checkbox name="updateInventory" value="on" label="Update inventory quantity" />
+            <s-checkbox name="updateUnitCost" value="on" label="Update unit cost (if authorized)" />
+            <input type="hidden" name="confirm" value="yes" />
+            <s-text>
+              Approving creates an immutable change set and queues Shopify updates in the background. You can close this
+              tab; the job keeps running.
+            </s-text>
+            <s-button type="submit" variant="primary" disabled={data.run.status !== "ready_for_review"}>
+              Approve selected changes
+            </s-button>
+          </s-stack>
+        </s-section>
+      </Form>
+    </s-page>
+  );
+}
+
+export const headers: HeadersFunction = (h) => boundary.headers(h);
