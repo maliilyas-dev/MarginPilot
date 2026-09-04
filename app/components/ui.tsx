@@ -5,7 +5,10 @@
  * visually native to Shopify admin, works in the App Bridge iframe, and meets
  * Built for Shopify UI expectations. No custom CSS framework.
  */
+import { useEffect } from "react";
 import type { ComponentProps, ReactNode } from "react";
+import { useRevalidator } from "react-router";
+import { computeProgress } from "../domain/progress";
 
 type Tone = "auto" | "neutral" | "info" | "success" | "caution" | "warning" | "critical";
 type IconName = NonNullable<ComponentProps<"s-icon">["type"]>;
@@ -260,6 +263,113 @@ export function ProgressMeter({ done, total }: { done: number; total: number }) 
           }}
         />
       </div>
+    </s-stack>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Live job progress (catalog sync / feed run / change apply)                 */
+/* -------------------------------------------------------------------------- */
+
+/** Revalidate the current route on an interval while `active` is true. */
+export function useLiveRefresh(active: boolean, intervalMs = 2500) {
+  const revalidator = useRevalidator();
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => {
+      if (revalidator.state === "idle") revalidator.revalidate();
+    }, intervalMs);
+    return () => clearInterval(id);
+  }, [active, intervalMs, revalidator]);
+}
+
+export interface JobProgressProps {
+  phase: string | null;
+  done: number;
+  total: number;
+  startedAt: string | null;
+  finishedAt?: string | null;
+  active: boolean;
+  /** overrides the phase line, e.g. a failure summary */
+  note?: string | null;
+  tone?: Tone;
+}
+
+/**
+ * Animated progress bar with phase, "N of M", elapsed and ETA — the
+ * Matrixify-style readout. Renders nothing useful when there's no work.
+ */
+export function JobProgress({
+  phase,
+  done,
+  total,
+  startedAt,
+  finishedAt = null,
+  active,
+  note = null,
+  tone = "info",
+}: JobProgressProps) {
+  const p = computeProgress({ phase, done, total, startedAt, finishedAt, active });
+  const barColor =
+    tone === "critical"
+      ? "var(--s-color-bg-fill-critical, #d72c0d)"
+      : tone === "success"
+        ? "var(--s-color-bg-fill-success, #008060)"
+        : "var(--s-color-bg-fill-brand, #303030)";
+
+  return (
+    <s-stack direction="block" gap="small-300">
+      <s-stack direction="inline" gap="small-200" alignItems="center">
+        {active ? <s-spinner size="base" /> : null}
+        <s-text type="strong">{note ?? p.phase ?? (active ? "Working…" : "Done")}</s-text>
+        {p.total > 0 ? <s-badge tone={active ? "info" : "success"}>{p.countLabel}</s-badge> : null}
+      </s-stack>
+
+      <div
+        style={{
+          height: 8,
+          borderRadius: 999,
+          background: "rgba(0,0,0,.08)",
+          overflow: "hidden",
+          position: "relative",
+        }}
+        role="progressbar"
+        aria-valuenow={p.percent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        <div
+          style={{
+            width: `${p.total > 0 ? p.percent : active ? 40 : 100}%`,
+            height: "100%",
+            borderRadius: 999,
+            background: barColor,
+            transition: "width .4s cubic-bezier(.4,0,.2,1)",
+            ...(active && p.total === 0
+              ? { animation: "mp-indeterminate 1.4s ease-in-out infinite" }
+              : {}),
+          }}
+        />
+      </div>
+
+      <s-stack direction="inline" gap="base" alignItems="center">
+        <s-text color="subdued">{p.percent}%</s-text>
+        <s-text color="subdued">·</s-text>
+        <s-text color="subdued">{p.elapsedLabel} elapsed</s-text>
+        {p.etaLabel ? (
+          <>
+            <s-text color="subdued">·</s-text>
+            <s-text color="subdued">{p.etaLabel}</s-text>
+          </>
+        ) : null}
+      </s-stack>
+
+      <style
+        dangerouslySetInnerHTML={{
+          __html:
+            "@keyframes mp-indeterminate{0%{transform:translateX(-60%)}100%{transform:translateX(220%)}}",
+        }}
+      />
     </s-stack>
   );
 }

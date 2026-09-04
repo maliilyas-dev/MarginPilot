@@ -8,6 +8,9 @@ export const SHOP_LOCATIONS_QUERY = /* GraphQL */ `
       currencyCode
       ianaTimezone
     }
+    productsCount {
+      count
+    }
     locations(first: 50, includeInactive: false) {
       edges {
         node {

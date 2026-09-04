@@ -67,6 +67,7 @@ interface VariantsPageData {
 
 interface ShopLocationsData {
   shop: { id: string; currencyCode: string; ianaTimezone: string } | null;
+  productsCount?: { count: number } | null;
   locations: { edges: Array<{ node: { id: string; name: string; isActive: boolean } }> };
 }
 
@@ -101,8 +102,23 @@ async function runCatalogSyncInner(deps: CatalogSyncDeps) {
 
   await prisma.catalogSync.update({
     where: { id: deps.catalogSyncId },
-    data: { status: "running", startedAt: new Date() },
+    data: {
+      status: "running",
+      startedAt: new Date(),
+      progressPhase: "Connecting to Shopify",
+      progressDone: 0,
+      progressTotal: 0,
+    },
   });
+
+  const bump = (data: {
+    progressPhase?: string;
+    progressDone?: number;
+    progressTotal?: number;
+  }) =>
+    prisma.catalogSync
+      .update({ where: { id: deps.catalogSyncId }, data })
+      .catch(() => undefined);
 
   // 1. Shop + locations
   const shopRes: GraphqlResult<ShopLocationsData> = await client.request<ShopLocationsData>(
@@ -125,6 +141,9 @@ async function runCatalogSyncInner(deps: CatalogSyncDeps) {
   let productCount = 0;
   let variantCount = 0;
   let cursor: string | null = null;
+
+  const totalProducts = shopRes.data?.productsCount?.count ?? 0;
+  await bump({ progressPhase: "Reading products", progressTotal: totalProducts, progressDone: 0 });
 
   // 2. Products page loop
   // eslint-disable-next-line no-constant-condition
@@ -231,9 +250,16 @@ async function runCatalogSyncInner(deps: CatalogSyncDeps) {
       void normalizeBarcode; // barcode normalization is applied at match time (see matcher)
     }
 
+    await bump({ progressDone: productCount });
     if (!page.pageInfo.hasNextPage) break;
     cursor = page.pageInfo.endCursor;
   }
+
+  await bump({
+    progressPhase: "Reconciling removed items",
+    progressDone: productCount,
+    progressTotal: Math.max(totalProducts, productCount),
+  });
 
   // 3. Mark vanished records inactive (never hard-delete here)
   await prisma.shopifyProduct.updateMany({
@@ -247,7 +273,15 @@ async function runCatalogSyncInner(deps: CatalogSyncDeps) {
 
   await prisma.catalogSync.update({
     where: { id: deps.catalogSyncId },
-    data: { status: "completed", completedAt: new Date(), productCount, variantCount },
+    data: {
+      status: "completed",
+      completedAt: new Date(),
+      productCount,
+      variantCount,
+      progressPhase: "Completed",
+      progressDone: Math.max(totalProducts, productCount),
+      progressTotal: Math.max(totalProducts, productCount),
+    },
   });
 
   log.info({ productCount, variantCount }, "catalog sync complete");

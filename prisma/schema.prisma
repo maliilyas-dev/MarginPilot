@@ -71,17 +71,21 @@ model Shop {
 }
 
 model CatalogSync {
-  id           String    @id @default(cuid())
-  shopId       String
-  shop         Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  status       String    @default("queued") // queued | running | completed | failed
-  startedAt    DateTime  @default(now())
-  completedAt  DateTime?
-  productCount Int       @default(0)
-  variantCount Int       @default(0)
-  errorSummary String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  shopId        String
+  shop          Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  status        String    @default("queued") // queued | running | completed | failed
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+  productCount  Int       @default(0)
+  variantCount  Int       @default(0)
+  // Live progress (Matrixify-style ETA in the UI).
+  progressPhase String? // e.g. "Reading products", "Reconciling"
+  progressDone  Int       @default(0)
+  progressTotal Int       @default(0)
+  errorSummary  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([shopId, startedAt])
 }
@@ -322,6 +326,10 @@ model FeedRun {
   rulesSnapshot     Json?
   safetySnapshot    Json?
   errorSummary      String?
+  // Live progress for the pipeline (fetch -> parse -> validate -> map -> calc).
+  progressPhase     String?
+  progressDone      Int            @default(0)
+  progressTotal     Int            @default(0)
   startedAt         DateTime?
   completedAt       DateTime?
   createdAt         DateTime       @default(now())
@@ -423,6 +431,11 @@ model ChangeSet {
   approvedBy      String?
   approvedAt      DateTime?
   idempotencyKey  String          @unique
+  // Live apply progress.
+  itemsTotal      Int             @default(0)
+  itemsDone       Int             @default(0)
+  startedAt       DateTime?
+  finishedAt      DateTime?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 

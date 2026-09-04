@@ -40,6 +40,9 @@ export async function runFeedPipeline(deps: RunPipelineDeps) {
   const log = logger.child({ scope: "feed-pipeline", feedRunId: run.id, shopId: run.shopId });
   const supplier = run.supplier;
 
+  const bump = (data: { progressPhase?: string; progressDone?: number; progressTotal?: number }) =>
+    prisma.feedRun.update({ where: { id: run.id }, data }).catch(() => undefined);
+
   const fail = async (summary: string, alertType: Parameters<typeof createAlert>[0]["type"]) => {
     await prisma.feedRun.update({
       where: { id: run.id },
@@ -60,7 +63,7 @@ export async function runFeedPipeline(deps: RunPipelineDeps) {
   let source: Readable;
   let sourceBytes: Buffer;
   try {
-    await prisma.feedRun.update({ where: { id: run.id }, data: { status: "fetching", startedAt: new Date() } });
+    await prisma.feedRun.update({ where: { id: run.id }, data: { status: "fetching", startedAt: new Date(), progressPhase: "Retrieving feed", progressDone: 0, progressTotal: 0 } });
     if (deps.uploadBuffer) {
       sourceBytes = deps.uploadBuffer;
     } else if (supplier.feedType === "upload_csv") {
@@ -101,7 +104,7 @@ export async function runFeedPipeline(deps: RunPipelineDeps) {
   }
 
   // ---- PARSE ----
-  await prisma.feedRun.update({ where: { id: run.id }, data: { status: "parsing", sourceChecksum: checksum } });
+  await prisma.feedRun.update({ where: { id: run.id }, data: { status: "parsing", sourceChecksum: checksum, progressPhase: "Parsing rows" } });
   const profile = await prisma.feedMappingProfile.findFirst({
     where: { supplierId: supplier.id, isDefault: true },
   });
@@ -134,7 +137,7 @@ export async function runFeedPipeline(deps: RunPipelineDeps) {
   }
 
   // ---- VALIDATING ----
-  await prisma.feedRun.update({ where: { id: run.id }, data: { status: "validating", headerFingerprint: profile.headerFingerprint } });
+  await prisma.feedRun.update({ where: { id: run.id }, data: { status: "validating", headerFingerprint: profile.headerFingerprint, progressPhase: "Validating rows", progressTotal: normalizedRows.length } });
   const dupes = flagDuplicateSkus(normalizedRows);
   for (const row of normalizedRows) {
     if (row.supplierSkuNormalized && dupes.has(row.supplierSkuNormalized)) {
@@ -186,7 +189,7 @@ export async function runFeedPipeline(deps: RunPipelineDeps) {
   });
 
   // ---- MAPPING ----
-  await prisma.feedRun.update({ where: { id: run.id }, data: { status: "mapping" } });
+  await prisma.feedRun.update({ where: { id: run.id }, data: { status: "mapping", progressPhase: "Matching SKUs", progressDone: 0 } });
   const variants = await prisma.shopifyVariant.findMany({
     where: { shopId: run.shopId, activeLocally: true },
     select: {
@@ -210,12 +213,20 @@ export async function runFeedPipeline(deps: RunPipelineDeps) {
   const explicitBySku = new Map(explicitMappings.map((m) => [m.supplierSkuNormalized, m]));
 
   // ---- CALCULATING ----
-  await prisma.feedRun.update({ where: { id: run.id }, data: { status: "calculating" } });
   const rules = (await prisma.pricingRule.findMany({
     where: { shopId: run.shopId, OR: [{ supplierId: supplier.id }, { supplierId: null }] },
   })) as unknown as SelectableRule[];
 
   const feedRowRecords = await prisma.feedRow.findMany({ where: { feedRunId: run.id }, orderBy: { rowNumber: "asc" } });
+  await prisma.feedRun.update({
+    where: { id: run.id },
+    data: {
+      status: "calculating",
+      progressPhase: "Calculating prices & safety",
+      progressDone: 0,
+      progressTotal: feedRowRecords.length,
+    },
+  });
 
   let matchedCount = 0;
   let unmatchedCount = 0;
@@ -347,6 +358,7 @@ export async function runFeedPipeline(deps: RunPipelineDeps) {
       // create (not createMany) so the 1:1 feedRowId unique is enforced cleanly
       await prisma.proposedChange.create({ data });
     }
+    await bump({ progressDone: Math.min(i + slice.length, feedRowRecords.length) });
   }
 
   // Persist explicit mapping rows discovered by exact match so future runs are faster.
@@ -397,6 +409,9 @@ export async function runFeedPipeline(deps: RunPipelineDeps) {
       rulesSnapshot: rules as object,
       safetySnapshot: safety as object,
       completedAt: null,
+      progressPhase: "Ready for review",
+      progressDone: feedRowRecords.length,
+      progressTotal: feedRowRecords.length,
     },
   });
 

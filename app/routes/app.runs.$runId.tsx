@@ -1,10 +1,9 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { useLoaderData, useRevalidator } from "react-router";
-import { useEffect } from "react";
+import { useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop, requireFeedRun } from "../services/shopContext.server";
-import { StatCard, StatGrid, runStatusBadge } from "../components/ui";
+import { JobProgress, StatCard, StatGrid, runStatusBadge, useLiveRefresh } from "../components/ui";
 import prisma from "../db.server";
 
 const ACTIVE = ["queued", "fetching", "parsing", "validating", "mapping", "calculating", "applying"];
@@ -37,8 +36,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       supplier: supplier?.name ?? "",
       trigger: run.trigger,
       at: run.createdAt.toISOString(),
+      startedAt: run.startedAt?.toISOString() ?? null,
       completedAt: run.completedAt?.toISOString() ?? null,
       errorSummary: run.errorSummary,
+      progressPhase: run.progressPhase,
+      progressDone: run.progressDone,
+      progressTotal: run.progressTotal,
       counts: {
         rows: run.rowCount, valid: run.validCount, invalid: run.invalidCount,
         matched: run.matchedCount, unmatched: run.unmatchedCount, ambiguous: run.ambiguousCount,
@@ -60,18 +63,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
 export default function RunDetail() {
   const { run, changeSet, failedItems, isActive } = useLoaderData<typeof loader>();
-  const revalidator = useRevalidator();
-
-  useEffect(() => {
-    if (!isActive) return;
-    const t = setInterval(() => revalidator.revalidate(), 3000);
-    return () => clearInterval(t);
-  }, [isActive, revalidator]);
+  useLiveRefresh(isActive);
 
   return (
     <s-page heading={`Run — ${run.supplier}`}>
       {run.status === "ready_for_review" && (
-        <s-button slot="primary-action" href={`/app/runs/${run.id}/review`}>
+        <s-button slot="primary-action" href={`/app/runs/${run.id}/review`} variant="primary">
           Review changes
         </s-button>
       )}
@@ -79,12 +76,21 @@ export default function RunDetail() {
         <s-stack direction="block" gap="base">
           <s-stack direction="inline" gap="base" alignItems="center">
             {runStatusBadge(run.status)}
-            {isActive ? <s-spinner size="base" /> : null}
           </s-stack>
-          <s-text color="subdued">
-            Started {new Date(run.at).toLocaleString()}
-            {run.completedAt ? ` · finished ${new Date(run.completedAt).toLocaleString()}` : ""}
-          </s-text>
+          {isActive ? (
+            <JobProgress
+              phase={run.progressPhase}
+              done={run.progressDone}
+              total={run.progressTotal}
+              startedAt={run.startedAt}
+              active
+            />
+          ) : (
+            <s-text color="subdued">
+              Started {new Date(run.at).toLocaleString()}
+              {run.completedAt ? ` · finished ${new Date(run.completedAt).toLocaleString()}` : ""}
+            </s-text>
+          )}
           {run.errorSummary && <s-banner tone="critical">{run.errorSummary}</s-banner>}
           <div>
             <s-link href={`/app/resources/runs/${run.id}/export`} download="">

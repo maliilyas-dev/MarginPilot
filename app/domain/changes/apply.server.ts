@@ -46,8 +46,29 @@ export async function applyChangeSet(deps: ApplyDeps) {
     return;
   }
 
-  await prisma.changeSet.update({ where: { id: changeSet.id }, data: { status: "applying" } });
-  await prisma.feedRun.update({ where: { id: changeSet.feedRunId }, data: { status: "applying" } });
+  await prisma.changeSet.update({
+    where: { id: changeSet.id },
+    data: {
+      status: "applying",
+      startedAt: changeSet.startedAt ?? new Date(),
+      itemsTotal: changeSet.items.length,
+      itemsDone: changeSet.items.filter((i) => i.status === "succeeded").length,
+    },
+  });
+  await prisma.feedRun.update({
+    where: { id: changeSet.feedRunId },
+    data: { status: "applying", progressPhase: "Writing to Shopify", progressTotal: changeSet.items.length, progressDone: 0 },
+  });
+
+  let processed = 0;
+  const bumpDone = () => {
+    processed += 1;
+    if (processed % 5 === 0 || processed === changeSet.items.length) {
+      const done = processed;
+      void prisma.changeSet.update({ where: { id: changeSet.id }, data: { itemsDone: done } }).catch(() => undefined);
+      void prisma.feedRun.update({ where: { id: changeSet.feedRunId }, data: { progressDone: done } }).catch(() => undefined);
+    }
+  };
 
   const client = createAdminGraphqlClient({ shopDomain: deps.shopDomain, accessToken: deps.accessToken });
   const location = changeSet.feedRun.supplierId
@@ -63,6 +84,7 @@ export async function applyChangeSet(deps: ApplyDeps) {
   await pMapBounded(changeSet.items, CONCURRENCY, async (item) => {
     if (item.status === "succeeded") {
       skipped += 1;
+      bumpDone();
       return;
     }
     const variant = item.variant;
@@ -200,15 +222,25 @@ export async function applyChangeSet(deps: ApplyDeps) {
       });
     }
     void requestId;
+    bumpDone();
   });
 
   const finalStatus =
     failed === 0 ? "completed" : succeeded === 0 ? "failed" : "partially_completed";
 
-  await prisma.changeSet.update({ where: { id: changeSet.id }, data: { status: finalStatus } });
+  await prisma.changeSet.update({
+    where: { id: changeSet.id },
+    data: { status: finalStatus, finishedAt: new Date(), itemsDone: changeSet.items.length },
+  });
   await prisma.feedRun.update({
     where: { id: changeSet.feedRunId },
-    data: { status: finalStatus === "completed" ? "completed" : finalStatus === "failed" ? "failed" : "partially_completed", completedAt: new Date() },
+    data: {
+      status: finalStatus === "completed" ? "completed" : finalStatus === "failed" ? "failed" : "partially_completed",
+      completedAt: new Date(),
+      progressPhase: finalStatus === "completed" ? "Completed" : "Finished with errors",
+      progressDone: changeSet.items.length,
+      progressTotal: changeSet.items.length,
+    },
   });
 
   await recordAudit({

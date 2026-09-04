@@ -3,8 +3,11 @@ import { useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop } from "../services/shopContext.server";
-import { EmptyState, runStatusBadge } from "../components/ui";
+import { EmptyState, runStatusBadge, useLiveRefresh } from "../components/ui";
+import { computeProgress } from "../domain/progress";
 import prisma from "../db.server";
+
+const ACTIVE_STATUSES = ["queued", "fetching", "parsing", "validating", "mapping", "calculating", "applying"];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -33,17 +36,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       trigger: r.trigger,
       status: r.status,
       at: r.createdAt.toISOString(),
+      startedAt: r.startedAt?.toISOString() ?? null,
       rows: r.rowCount,
       matched: r.matchedCount,
       warnings: r.warningCount,
       blocked: r.blockedCount,
       safe: r.safeChangeCount,
+      progressPhase: r.progressPhase,
+      progressDone: r.progressDone,
+      progressTotal: r.progressTotal,
+      active: ACTIVE_STATUSES.includes(r.status),
     })),
   };
 };
 
 export default function RunsIndex() {
   const { runs, page, totalPages } = useLoaderData<typeof loader>();
+  useLiveRefresh(runs.some((r) => r.active));
   return (
     <s-page heading="Runs">
       <s-section>
@@ -90,7 +99,25 @@ export default function RunsIndex() {
                   <s-table-cell>
                     <s-text tone={r.blocked > 0 ? "critical" : "auto"}>{r.blocked}</s-text>
                   </s-table-cell>
-                  <s-table-cell>{runStatusBadge(r.status)}</s-table-cell>
+                  <s-table-cell>
+                    <s-stack direction="block" gap="none">
+                      {runStatusBadge(r.status)}
+                      {r.active ? (
+                        <s-text color="subdued">
+                          {(() => {
+                            const p = computeProgress({
+                              phase: r.progressPhase,
+                              done: r.progressDone,
+                              total: r.progressTotal,
+                              startedAt: r.startedAt,
+                              active: true,
+                            });
+                            return `${r.progressPhase ?? "Working"} · ${p.percent}%${p.etaLabel ? ` · ${p.etaLabel}` : ""}`;
+                          })()}
+                        </s-text>
+                      ) : null}
+                    </s-stack>
+                  </s-table-cell>
                   <s-table-cell>
                     <s-link href={r.status === "ready_for_review" ? `/app/runs/${r.id}/review` : `/app/runs/${r.id}`}>
                       {r.status === "ready_for_review" ? "Review" : "Open"}

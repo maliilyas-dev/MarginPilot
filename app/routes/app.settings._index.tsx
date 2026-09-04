@@ -6,7 +6,7 @@ import { authenticate } from "../shopify.server";
 import { requireShop, markOnboarding } from "../services/shopContext.server";
 import { recordAudit } from "../services/audit.server";
 import { requestCatalogSync } from "../services/catalogSyncRequest.server";
-import { Callout, StatCard, StatGrid } from "../components/ui";
+import { Callout, JobProgress, StatCard, StatGrid, useLiveRefresh } from "../components/ui";
 import prisma from "../db.server";
 
 const schema = z.object({
@@ -64,7 +64,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       maxRowCountDecreasePercent: Number(safety.maxRowCountDecreasePercent),
       allowZeroCost: safety.allowZeroCost,
     },
-    lastSync: lastSync && { status: lastSync.status, at: (lastSync.completedAt ?? lastSync.startedAt).toISOString(), variantCount: lastSync.variantCount },
+    lastSync: lastSync && {
+      status: lastSync.status,
+      at: (lastSync.completedAt ?? lastSync.startedAt).toISOString(),
+      startedAt: lastSync.startedAt.toISOString(),
+      variantCount: lastSync.variantCount,
+      errorSummary: lastSync.errorSummary,
+      progressPhase: lastSync.progressPhase,
+      progressDone: lastSync.progressDone,
+      progressTotal: lastSync.progressTotal,
+      active: lastSync.status === "queued" || lastSync.status === "running",
+    },
     variantCount,
   };
 };
@@ -106,28 +116,64 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function Settings() {
   const { shop, locations, safety, lastSync, variantCount } = useLoaderData<typeof loader>();
   const sync = useFetcher<{ ok: boolean; catalogSyncId?: string; alreadyRunning?: boolean; message?: string }>();
+  const syncActive = Boolean(lastSync?.active) || sync.state !== "idle";
+  useLiveRefresh(syncActive);
 
   return (
     <s-page heading="Settings">
       <s-section heading="Shopify catalog">
         <s-stack direction="block" gap="base">
+          <Callout tone="info" icon="refresh" title="Keep your catalog in sync">
+            MarginPilot needs an up-to-date copy of your products, variants, SKUs, prices and inventory to match supplier
+            rows against. This is read-only and safe to run any time — do it after you add or edit products in Shopify.
+          </Callout>
+
           <StatGrid>
             <StatCard label="Active variants imported" value={variantCount.toLocaleString()} icon="product" tone="info" />
             <StatCard
               label="Last sync"
               value={lastSync ? lastSync.status : "Never"}
               icon="refresh"
-              tone={lastSync?.status === "completed" ? "success" : "neutral"}
+              tone={
+                lastSync?.status === "completed"
+                  ? "success"
+                  : lastSync?.status === "failed"
+                    ? "critical"
+                    : "neutral"
+              }
               caption={lastSync ? new Date(lastSync.at).toLocaleString() : "Run a sync to get started"}
             />
           </StatGrid>
+
+          {lastSync?.active ? (
+            <s-box padding="base" borderRadius="base" borderWidth="base" background="base">
+              <JobProgress
+                phase={lastSync.progressPhase}
+                done={lastSync.progressDone}
+                total={lastSync.progressTotal}
+                startedAt={lastSync.startedAt}
+                active
+              />
+            </s-box>
+          ) : null}
+
+          {lastSync?.status === "failed" && lastSync.errorSummary ? (
+            <s-banner tone="critical" heading="Last sync failed">
+              <s-paragraph>{lastSync.errorSummary}</s-paragraph>
+            </s-banner>
+          ) : null}
+
           <sync.Form method="post">
             <input type="hidden" name="intent" value="catalog-sync" />
-            <s-button type="submit" variant="primary" {...(sync.state !== "idle" ? { loading: true } : {})}>
-              Sync catalog now
+            <s-button
+              type="submit"
+              variant="primary"
+              {...(sync.state !== "idle" || lastSync?.active ? { loading: true } : {})}
+            >
+              {lastSync?.active ? "Sync running…" : "Sync catalog now"}
             </s-button>
           </sync.Form>
-          {sync.data?.ok && (
+          {sync.data?.ok && !lastSync?.active && (
             <s-banner tone="success">
               {sync.data.alreadyRunning ? "A sync is already running." : "Catalog sync queued — it runs in the background."}
             </s-banner>
