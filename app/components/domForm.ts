@@ -8,19 +8,16 @@
  */
 export type FieldKind = "text" | "check";
 
-/**
- * A `<s-select>` whose "none/default" option has `value=""` can, on some
- * Polaris versions, report something other than an empty string for
- * `.value` when that option is selected (observed: a stray non-empty
- * string). That's silently corrupting for fields with no DB constraint to
- * catch it (a Shopify GID) and a thrown foreign-key error for fields that
- * reference another table. Use this to only accept values that actually
- * look like the Shopify GID they're supposed to be.
- */
-export function sanitizeShopifyGid(value: string | null | undefined, resource?: string): string | null {
-  if (!value) return null;
-  const prefix = resource ? `gid://shopify/${resource}/` : "gid://shopify/";
-  return value.startsWith(prefix) ? value : null;
+/** Find the first descendant whose `name` attribute exactly equals `name`. */
+function findByName(root: HTMLElement, name: string): (HTMLElement & { value?: unknown; checked?: boolean }) | null {
+  // Not a CSS-selector attribute match: names like "mapping[supplier_sku]"
+  // contain characters that would need care to embed in a selector string,
+  // and are trivial to get wrong (see git history). Just walk the DOM.
+  const all = root.querySelectorAll<HTMLElement>("*");
+  for (const el of all) {
+    if (el.getAttribute("name") === name) return el as HTMLElement & { value?: unknown; checked?: boolean };
+  }
+  return null;
 }
 
 export function readFields(
@@ -30,9 +27,7 @@ export function readFields(
   const out: Record<string, string> = {};
   if (!root) return out;
   for (const [name, kind] of Object.entries(spec)) {
-    const el = root.querySelector(`[name="${CSS.escape(name)}"]`) as
-      | (HTMLElement & { value?: unknown; checked?: boolean })
-      | null;
+    const el = findByName(root, name);
     if (!el) {
       out[name] = "";
       continue;
@@ -47,4 +42,19 @@ export function readFields(
           : String(el.value);
   }
   return out;
+}
+
+/**
+ * A `<s-select>` whose "none/default" option has `value=""` can, on some
+ * Polaris versions, report something other than an empty string for
+ * `.value` when that option is selected (observed: a stray non-empty
+ * string). That's silently corrupting for fields with no DB constraint to
+ * catch it (a Shopify GID) and a thrown foreign-key error for fields that
+ * reference another table. Use this to only accept values that actually
+ * look like the Shopify GID they're supposed to be.
+ */
+export function sanitizeShopifyGid(value: string | null | undefined, resource?: string): string | null {
+  if (!value) return null;
+  const prefix = resource ? `gid://shopify/${resource}/` : "gid://shopify/";
+  return value.startsWith(prefix) ? value : null;
 }
