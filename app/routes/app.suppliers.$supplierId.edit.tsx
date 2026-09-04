@@ -44,9 +44,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const shop = await requireShop(session);
   const supplier = await requireSupplier(shop.id, params.supplierId!);
   const parsed = schema.safeParse(Object.fromEntries(await request.formData()));
-  if (!parsed.success) return { error: "Check the values." };
+  if (!parsed.success) {
+    const first = Object.values(parsed.error.flatten().fieldErrors)[0]?.[0];
+    return { error: first ?? "Check the values." };
+  }
   const d = parsed.data;
 
+  try {
   const schedGate = await canUseSchedule(shop.id, shop.shopDomain, d.schedule);
   if (!schedGate.allowed) return { error: schedGate.reason };
 
@@ -74,6 +78,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     summary: `Updated supplier ${d.name}.`,
   });
   return redirect(`/app/suppliers/${supplier.id}`);
+  } catch (err) {
+    if (err instanceof Response) throw err;
+    console.error("[suppliers.edit] action failed", err);
+    const message = err instanceof Error ? err.message : String(err);
+    return { error: `Could not save: ${message}` };
+  }
 };
 
 export default function EditSupplier() {

@@ -56,39 +56,48 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shop = await requireShop(session);
   const parsed = schema.safeParse(Object.fromEntries(await request.formData()));
-  if (!parsed.success) return { error: "Check the form values." };
+  if (!parsed.success) {
+    const first = Object.values(parsed.error.flatten().fieldErrors)[0]?.[0];
+    return { error: first ?? "Check the form values." };
+  }
   const d = parsed.data;
 
-  if (d.intent === "delete" && d.id) {
-    await prisma.pricingRule.deleteMany({ where: { id: d.id, shopId: shop.id } });
-    await recordAudit({ shopId: shop.id, actorType: "merchant", action: "pricing_rule_deleted", resourceType: "pricing_rule", resourceId: d.id, summary: "Deleted a pricing rule." });
+  try {
+    if (d.intent === "delete" && d.id) {
+      await prisma.pricingRule.deleteMany({ where: { id: d.id, shopId: shop.id } });
+      await recordAudit({ shopId: shop.id, actorType: "merchant", action: "pricing_rule_deleted", resourceType: "pricing_rule", resourceId: d.id, summary: "Deleted a pricing rule." });
+      return { ok: true };
+    }
+
+    if ((d.minimumMarginPercent ?? 0) >= 100) {
+      return { error: "Minimum margin percent must be less than 100." };
+    }
+
+    const rule = await prisma.pricingRule.create({
+      data: {
+        shopId: shop.id,
+        supplierId: d.supplierId || null,
+        name: d.name || "Rule",
+        priority: d.priority ?? 100,
+        vendorFilter: d.vendorFilter || null,
+        productTypeFilter: d.productTypeFilter || null,
+        minimumMarginPercent: d.minimumMarginPercent ?? 0,
+        markupPercent: d.markupPercent ?? 0,
+        fixedHandlingPerUnit: d.fixedHandlingPerUnit ?? 0,
+        dutyPercent: d.dutyPercent ?? 0,
+        otherCostPercent: d.otherCostPercent ?? 0,
+        roundingRule: d.roundingRule ?? "none",
+        minimumPrice: d.minimumPrice ? d.minimumPrice : null,
+        maximumPrice: d.maximumPrice ? d.maximumPrice : null,
+      },
+    });
+    await recordAudit({ shopId: shop.id, actorType: "merchant", action: "pricing_rule_created", resourceType: "pricing_rule", resourceId: rule.id, summary: `Created pricing rule ${rule.name}.` });
     return { ok: true };
+  } catch (err) {
+    console.error("[rules] action failed", err);
+    const message = err instanceof Error ? err.message : String(err);
+    return { error: `Could not save the rule: ${message}` };
   }
-
-  if ((d.minimumMarginPercent ?? 0) >= 100) {
-    return { error: "Minimum margin percent must be less than 100." };
-  }
-
-  const rule = await prisma.pricingRule.create({
-    data: {
-      shopId: shop.id,
-      supplierId: d.supplierId || null,
-      name: d.name || "Rule",
-      priority: d.priority ?? 100,
-      vendorFilter: d.vendorFilter || null,
-      productTypeFilter: d.productTypeFilter || null,
-      minimumMarginPercent: d.minimumMarginPercent ?? 0,
-      markupPercent: d.markupPercent ?? 0,
-      fixedHandlingPerUnit: d.fixedHandlingPerUnit ?? 0,
-      dutyPercent: d.dutyPercent ?? 0,
-      otherCostPercent: d.otherCostPercent ?? 0,
-      roundingRule: d.roundingRule ?? "none",
-      minimumPrice: d.minimumPrice ? d.minimumPrice : null,
-      maximumPrice: d.maximumPrice ? d.maximumPrice : null,
-    },
-  });
-  await recordAudit({ shopId: shop.id, actorType: "merchant", action: "pricing_rule_created", resourceType: "pricing_rule", resourceId: rule.id, summary: `Created pricing rule ${rule.name}.` });
-  return { ok: true };
 };
 
 export default function Rules() {

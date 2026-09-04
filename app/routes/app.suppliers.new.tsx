@@ -62,54 +62,61 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
   const d = parsed.data;
 
-  const gate = await canAddSupplier(shop.id, shop.shopDomain);
-  if (!gate.allowed) return { errors: { _form: [gate.reason ?? "Plan limit reached"] } };
+  try {
+    const gate = await canAddSupplier(shop.id, shop.shopDomain);
+    if (!gate.allowed) return { errors: { _form: [gate.reason ?? "Plan limit reached"] } };
 
-  if (d.feedType === "url_csv") {
-    const urlGate = await canUseUrlFeed(shop.id, shop.shopDomain);
-    if (!urlGate.allowed) return { errors: { _form: [urlGate.reason ?? "URL feeds not on your plan"] } };
-    if (!d.feedUrl) return { errors: { feedUrl: ["A feed URL is required for URL sources."] } };
-  }
-  const schedGate = await canUseSchedule(shop.id, shop.shopDomain, d.schedule);
-  if (!schedGate.allowed) return { errors: { schedule: [schedGate.reason ?? "Schedule not on your plan"] } };
+    if (d.feedType === "url_csv") {
+      const urlGate = await canUseUrlFeed(shop.id, shop.shopDomain);
+      if (!urlGate.allowed) return { errors: { _form: [urlGate.reason ?? "URL feeds not on your plan"] } };
+      if (!d.feedUrl) return { errors: { feedUrl: ["A feed URL is required for URL sources."] } };
+    }
+    const schedGate = await canUseSchedule(shop.id, shop.shopDomain, d.schedule);
+    if (!schedGate.allowed) return { errors: { schedule: [schedGate.reason ?? "Schedule not on your plan"] } };
 
-  const existing = await prisma.supplier.findFirst({ where: { shopId: shop.id, code: d.code } });
-  if (existing) return { errors: { code: ["A supplier with that code already exists."] } };
+    const existing = await prisma.supplier.findFirst({ where: { shopId: shop.id, code: d.code } });
+    if (existing) return { errors: { code: ["A supplier with that code already exists."] } };
 
-  const supplier = await prisma.supplier.create({
-    data: {
+    const supplier = await prisma.supplier.create({
+      data: {
+        shopId: shop.id,
+        name: d.name,
+        code: d.code,
+        feedType: d.feedType,
+        feedUrl: d.feedType === "url_csv" ? d.feedUrl || null : null,
+        encryptedCredentials:
+          d.feedType === "url_csv" ? encryptCredentials({ username: d.basicUser, password: d.basicPass }) : null,
+        delimiter: d.delimiter,
+        decimalSeparator: d.decimalSeparator,
+        thousandsSeparator: d.thousandsSeparator || null,
+        currencyCode: d.currencyCode || shop.currencyCode,
+        schedule: d.schedule,
+        timezone: d.timezone || shop.timezone,
+        defaultLocationGid: d.defaultLocationGid || shop.defaultLocationGid,
+        barcodeMatching: d.barcodeMatching === "on",
+      },
+    });
+
+    await markOnboarding(shop.id, { supplierAdded: true });
+    await recordAudit({
       shopId: shop.id,
-      name: d.name,
-      code: d.code,
-      feedType: d.feedType,
-      feedUrl: d.feedType === "url_csv" ? d.feedUrl || null : null,
-      encryptedCredentials:
-        d.feedType === "url_csv" ? encryptCredentials({ username: d.basicUser, password: d.basicPass }) : null,
-      delimiter: d.delimiter,
-      decimalSeparator: d.decimalSeparator,
-      thousandsSeparator: d.thousandsSeparator || null,
-      currencyCode: d.currencyCode || shop.currencyCode,
-      schedule: d.schedule,
-      timezone: d.timezone || shop.timezone,
-      defaultLocationGid: d.defaultLocationGid || shop.defaultLocationGid,
-      barcodeMatching: d.barcodeMatching === "on",
-    },
-  });
+      actorType: "merchant",
+      actorIdentifier: session.shop,
+      action: "supplier_created",
+      resourceType: "supplier",
+      resourceId: supplier.id,
+      summary: `Created supplier ${supplier.name} (${supplier.code})`,
+      ip: request.headers.get("x-forwarded-for"),
+    });
+    void hashIp;
 
-  await markOnboarding(shop.id, { supplierAdded: true });
-  await recordAudit({
-    shopId: shop.id,
-    actorType: "merchant",
-    actorIdentifier: session.shop,
-    action: "supplier_created",
-    resourceType: "supplier",
-    resourceId: supplier.id,
-    summary: `Created supplier ${supplier.name} (${supplier.code})`,
-    ip: request.headers.get("x-forwarded-for"),
-  });
-  void hashIp;
-
-  return redirect(`/app/suppliers/${supplier.id}`);
+    return redirect(`/app/suppliers/${supplier.id}`);
+  } catch (err) {
+    if (err instanceof Response) throw err; // let redirect() through
+    console.error("[suppliers.new] action failed", err);
+    const message = err instanceof Error ? err.message : String(err);
+    return { errors: { _form: [`Could not create the supplier: ${message}`] } };
+  }
 };
 
 export default function NewSupplier() {

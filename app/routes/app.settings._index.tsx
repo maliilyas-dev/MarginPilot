@@ -85,34 +85,43 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shop = await requireShop(session);
   const parsed = schema.safeParse(Object.fromEntries(await request.formData()));
-  if (!parsed.success) return { error: "Check the values." };
+  if (!parsed.success) {
+    const first = Object.values(parsed.error.flatten().fieldErrors)[0]?.[0];
+    return { error: first ?? "Check the values." };
+  }
   const d = parsed.data;
 
-  if (d.intent === "catalog-sync") {
-    return Response.json(await requestCatalogSync(shop, session.shop));
-  }
+  try {
+    if (d.intent === "catalog-sync") {
+      return Response.json(await requestCatalogSync(shop, session.shop));
+    }
 
-  if (d.intent === "location") {
-    await prisma.shop.update({ where: { id: shop.id }, data: { defaultLocationGid: d.defaultLocationGid || null } });
-    await markOnboarding(shop.id, { selectedLocation: Boolean(d.defaultLocationGid) });
-    await recordAudit({ shopId: shop.id, actorType: "merchant", action: "default_location_set", resourceType: "shop", resourceId: shop.id, summary: "Default inventory location updated." });
+    if (d.intent === "location") {
+      await prisma.shop.update({ where: { id: shop.id }, data: { defaultLocationGid: d.defaultLocationGid || null } });
+      await markOnboarding(shop.id, { selectedLocation: Boolean(d.defaultLocationGid) });
+      await recordAudit({ shopId: shop.id, actorType: "merchant", action: "default_location_set", resourceType: "shop", resourceId: shop.id, summary: "Default inventory location updated." });
+      return { ok: true };
+    }
+
+    await prisma.safetyPolicy.update({
+      where: { shopId: shop.id },
+      data: {
+        maxPriceDecreasePercent: d.maxPriceDecreasePercent ?? undefined,
+        maxPriceIncreasePercent: d.maxPriceIncreasePercent ?? undefined,
+        maxInventoryChangePercent: d.maxInventoryChangePercent ?? undefined,
+        maxInventoryAbsoluteChange: d.maxInventoryAbsoluteChange ?? undefined,
+        maxInvalidRowPercent: d.maxInvalidRowPercent ?? undefined,
+        maxRowCountDecreasePercent: d.maxRowCountDecreasePercent ?? undefined,
+        allowZeroCost: d.allowZeroCost === "on",
+      },
+    });
+    await recordAudit({ shopId: shop.id, actorType: "merchant", action: "safety_policy_updated", resourceType: "safety_policy", resourceId: shop.id, summary: "Safety policy updated." });
     return { ok: true };
+  } catch (err) {
+    console.error("[settings] action failed", err);
+    const message = err instanceof Error ? err.message : String(err);
+    return { error: `Could not save: ${message}` };
   }
-
-  await prisma.safetyPolicy.update({
-    where: { shopId: shop.id },
-    data: {
-      maxPriceDecreasePercent: d.maxPriceDecreasePercent ?? undefined,
-      maxPriceIncreasePercent: d.maxPriceIncreasePercent ?? undefined,
-      maxInventoryChangePercent: d.maxInventoryChangePercent ?? undefined,
-      maxInventoryAbsoluteChange: d.maxInventoryAbsoluteChange ?? undefined,
-      maxInvalidRowPercent: d.maxInvalidRowPercent ?? undefined,
-      maxRowCountDecreasePercent: d.maxRowCountDecreasePercent ?? undefined,
-      allowZeroCost: d.allowZeroCost === "on",
-    },
-  });
-  await recordAudit({ shopId: shop.id, actorType: "merchant", action: "safety_policy_updated", resourceType: "safety_policy", resourceId: shop.id, summary: "Safety policy updated." });
-  return { ok: true };
 };
 
 export default function Settings() {
