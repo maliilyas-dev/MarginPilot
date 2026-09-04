@@ -66,7 +66,7 @@ export default function Home() {
             {doneCount} of {ONBOARDING_STEPS.length} steps complete. Next: {data.primaryCta.label.toLowerCase()}. New to
             MarginPilot? <s-link href="/app/guide">Read the guide</s-link>.
           </s-paragraph>
-          <s-button slot="primary-action" href={data.primaryCta.href}>
+          <s-button slot="primary-action" href={data.primaryCta.href} variant="primary">
             {data.primaryCta.label}
           </s-button>
         </s-banner>
