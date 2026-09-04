@@ -1,11 +1,13 @@
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Form, useFetcher, useLoaderData } from "react-router";
+import { useRef } from "react";
+import { useFetcher, useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop, requireFeedRun } from "../services/shopContext.server";
 import { recordAudit } from "../services/audit.server";
 import { describeReason, type ReasonCodeValue } from "../domain/safety/reasonCodes";
 import { Callout, StatCard, StatGrid, classificationBadge, useLiveRefresh } from "../components/ui";
+import { readFields } from "../components/domForm";
 import prisma from "../db.server";
 
 const FILTERS = ["all", "safe", "warning", "blocked", "unmatched", "invalid", "unchanged"] as const;
@@ -125,7 +127,25 @@ const toneFor: Record<string, "success" | "warning" | "critical" | "neutral"> = 
 export default function Review() {
   const data = useLoaderData<typeof loader>();
   const override = useFetcher();
+  const approve = useFetcher();
+  const approveRef = useRef<HTMLDivElement>(null);
   useLiveRefresh(data.run.active);
+
+  const doApprove = () => {
+    const root = approveRef.current;
+    if (!root) return;
+    const ids = Array.from(root.querySelectorAll<HTMLInputElement>('input[name="proposedChangeId"]:checked')).map(
+      (el) => el.value,
+    );
+    const flags = readFields(root, { updatePrice: "check", updateInventory: "check", updateUnitCost: "check" });
+    const fd = new FormData();
+    for (const id of ids) fd.append("proposedChangeId", id);
+    if (flags.updatePrice) fd.append("updatePrice", "on");
+    if (flags.updateInventory) fd.append("updateInventory", "on");
+    if (flags.updateUnitCost) fd.append("updateUnitCost", "on");
+    fd.append("confirm", "yes");
+    approve.submit(fd, { method: "post", action: `/app/actions/runs/${data.run.id}/approve` });
+  };
 
   const doOverride = (proposedChangeId: string) => {
     override.submit(
@@ -214,7 +234,7 @@ export default function Review() {
         </s-stack>
       </s-section>
 
-      <Form method="post" action={`/app/actions/runs/${data.run.id}/approve`}>
+      <div ref={approveRef}>
         <s-section>
           <div style={{ overflowX: "auto" }}>
             <s-table>
@@ -310,13 +330,18 @@ export default function Review() {
               <s-checkbox name="updateInventory" value="on" label="Update inventory quantity" />
               <s-checkbox name="updateUnitCost" value="on" label="Update unit cost (if authorized)" />
             </s-stack>
-            <input type="hidden" name="confirm" value="yes" />
-            <s-button type="submit" variant="primary" disabled={!ready}>
+            <s-button
+              type="button"
+              variant="primary"
+              onClick={doApprove}
+              {...(!ready ? { disabled: true } : {})}
+              {...(approve.state !== "idle" ? { loading: true } : {})}
+            >
               Approve selected changes
             </s-button>
           </s-stack>
         </s-section>
-      </Form>
+      </div>
     </s-page>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { useFetcher, useLoaderData, useNavigate } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -6,6 +6,7 @@ import { authenticate } from "../shopify.server";
 import { requireShop, requireSupplier } from "../services/shopContext.server";
 import { ALL_FIELDS, FIELD_LABELS, REQUIRED_FIELDS, type CanonicalField, type ColumnMappings } from "../domain/feeds/canonicalFields";
 import { Callout, StatCard, StatGrid, runStatusBadge, supplierStatusBadge } from "../components/ui";
+import { readFields } from "../components/domForm";
 import prisma from "../db.server";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -55,6 +56,31 @@ export default function SupplierDetail() {
   const run = useFetcher<{ ok: boolean; redirectTo?: string; message?: string }>();
   const [, setHeaders] = useState<string[]>(upload.data?.headers ?? []);
   const navigate = useNavigate();
+  const uploadRef = useRef<HTMLDivElement>(null);
+
+  const submitUpload = () => {
+    const root = uploadRef.current;
+    if (!root) return;
+    const fileInput = root.querySelector('input[name="file"]') as HTMLInputElement | null;
+    const file = fileInput?.files?.[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("file", file);
+    const mappingFields: Record<string, "text"> = Object.fromEntries(
+      ALL_FIELDS.map((f) => [`mapping[${f}]`, "text" as const]),
+    );
+    const values = readFields(root, mappingFields);
+    for (const [k, v] of Object.entries(values)) {
+      if (v) fd.append(k, v);
+    }
+    const runAfterEl = root.querySelector('[name="runAfter"]') as (HTMLElement & { checked?: boolean }) | null;
+    if (runAfterEl?.checked) fd.append("runAfter", "on");
+    upload.submit(fd, {
+      method: "post",
+      action: `/app/actions/suppliers/${supplier.id}/upload`,
+      encType: "multipart/form-data",
+    });
+  };
 
   useEffect(() => {
     const to = upload.data?.redirectTo ?? run.data?.redirectTo;
@@ -94,11 +120,13 @@ export default function SupplierDetail() {
           <s-stack direction="block" gap="small-300">
             <s-text>Feed URL: {supplier.feedUrl}</s-text>
             <s-text>Credentials: {supplier.credentialsConfigured ? "configured" : "not configured"}</s-text>
-            <test.Form method="post" action={`/app/actions/suppliers/${supplier.id}/test`}>
-              <s-button type="submit" {...(test.state !== "idle" ? { loading: true } : {})}>
-                Test connection
-              </s-button>
-            </test.Form>
+            <s-button
+              type="button"
+              onClick={() => test.submit({}, { method: "post", action: `/app/actions/suppliers/${supplier.id}/test` })}
+              {...(test.state !== "idle" ? { loading: true } : {})}
+            >
+              Test connection
+            </s-button>
             {test.data && (
               <s-banner tone={test.data.ok ? "success" : "critical"}>
                 {test.data.ok
@@ -106,11 +134,14 @@ export default function SupplierDetail() {
                   : test.data.message}
               </s-banner>
             )}
-            <run.Form method="post" action={`/app/actions/suppliers/${supplier.id}/run`}>
-              <s-button type="submit" variant="primary" {...(run.state !== "idle" ? { loading: true } : {})}>
-                Run now
-              </s-button>
-            </run.Form>
+            <s-button
+              type="button"
+              variant="primary"
+              onClick={() => run.submit({}, { method: "post", action: `/app/actions/suppliers/${supplier.id}/run` })}
+              {...(run.state !== "idle" ? { loading: true } : {})}
+            >
+              Run now
+            </s-button>
             {run.data && !run.data.ok && <s-banner tone="critical">{run.data.message}</s-banner>}
           </s-stack>
         </s-section>
@@ -121,11 +152,7 @@ export default function SupplierDetail() {
           Map each canonical field to a CSV column header. Required: {REQUIRED_FIELDS.map((f) => FIELD_LABELS[f]).join(", ")}.
           The mapping is saved per supplier after the first successful upload.
         </Callout>
-        <upload.Form
-          method="post"
-          action={`/app/actions/suppliers/${supplier.id}/upload`}
-          encType="multipart/form-data"
-        >
+        <div ref={uploadRef}>
           <s-stack direction="block" gap="base">
             <div>
               <label
@@ -160,11 +187,16 @@ export default function SupplierDetail() {
               ))}
             </s-stack>
             <s-checkbox name="runAfter" value="on" label="Process this feed now after upload" />
-            <s-button type="submit" variant="primary" {...(upload.state !== "idle" ? { loading: true } : {})}>
+            <s-button
+              type="button"
+              variant="primary"
+              onClick={submitUpload}
+              {...(upload.state !== "idle" ? { loading: true } : {})}
+            >
               Upload
             </s-button>
           </s-stack>
-        </upload.Form>
+        </div>
         {upload.data && !upload.data.ok && (
           <s-banner tone="critical">
             {upload.data.message}

@@ -1,4 +1,5 @@
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
+import { useRef } from "react";
 import { useFetcher, useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { z } from "zod";
@@ -6,6 +7,7 @@ import { authenticate } from "../shopify.server";
 import { requireShop } from "../services/shopContext.server";
 import { recordAudit } from "../services/audit.server";
 import { Callout, EmptyState } from "../components/ui";
+import { readFields } from "../components/domForm";
 import prisma from "../db.server";
 
 const num = z.coerce.number().finite();
@@ -94,6 +96,18 @@ export default function Rules() {
   const create = useFetcher<typeof action>();
   const del = useFetcher<typeof action>();
   const actionData = create.data ?? del.data;
+  const formRef = useRef<HTMLDivElement>(null);
+  const creating = create.state !== "idle";
+
+  const addRule = () => {
+    const f = readFields(formRef.current, {
+      name: "text", supplierId: "text", priority: "text", vendorFilter: "text",
+      productTypeFilter: "text", fixedHandlingPerUnit: "text", dutyPercent: "text",
+      otherCostPercent: "text", minimumMarginPercent: "text", markupPercent: "text",
+      roundingRule: "text", minimumPrice: "text", maximumPrice: "text",
+    });
+    create.submit({ intent: "create", ...f }, { method: "post" });
+  };
 
   return (
     <s-page heading="Pricing rules">
@@ -154,8 +168,7 @@ export default function Rules() {
         )}
       </s-section>
 
-      <create.Form method="post">
-        <input type="hidden" name="intent" value="create" />
+      <div ref={formRef}>
 
         <s-section heading="New rule — scope">
           <s-stack direction="block" gap="base">
@@ -260,12 +273,12 @@ export default function Rules() {
               placeholder="optional"
               details="A hard ceiling applied after rounding."
             />
-            <s-button type="submit" variant="primary">
-              Add rule
+            <s-button type="button" variant="primary" onClick={addRule} {...(creating ? { loading: true } : {})}>
+              {creating ? "Adding…" : "Add rule"}
             </s-button>
           </s-stack>
         </s-section>
-      </create.Form>
+      </div>
 
       <s-section slot="aside" heading="Worked example">
         <s-box padding="base" borderRadius="base" background="subdued">
