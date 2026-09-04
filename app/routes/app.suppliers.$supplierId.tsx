@@ -7,6 +7,7 @@ import { requireShop, requireSupplier } from "../services/shopContext.server";
 import { ALL_FIELDS, FIELD_LABELS, REQUIRED_FIELDS, type CanonicalField, type ColumnMappings } from "../domain/feeds/canonicalFields";
 import { Callout, StatCard, StatGrid, runStatusBadge, supplierStatusBadge } from "../components/ui";
 import { readFields } from "../components/domForm";
+import { embeddedNavigate } from "../utils/embeddedNavigate";
 import { formatDateTime } from "../utils/format";
 import prisma from "../db.server";
 
@@ -84,7 +85,7 @@ export default function SupplierDetail() {
 
   useEffect(() => {
     const to = upload.data?.redirectTo ?? run.data?.redirectTo;
-    if (to) window.location.assign(to);
+    if (to) embeddedNavigate(to);
   }, [upload.data?.redirectTo, run.data?.redirectTo]);
 
   return (
@@ -100,7 +101,7 @@ export default function SupplierDetail() {
             <s-button
               type="button"
               variant="primary"
-              onClick={() => window.location.assign(`/app/suppliers/${supplier.id}/edit`)}
+              onClick={() => embeddedNavigate(`/app/suppliers/${supplier.id}/edit`)}
             >
               Edit supplier
             </s-button>

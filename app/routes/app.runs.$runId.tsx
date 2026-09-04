@@ -4,6 +4,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop, requireFeedRun } from "../services/shopContext.server";
 import { JobProgress, StatCard, StatGrid, runStatusBadge, useLiveRefresh } from "../components/ui";
+import { embeddedNavigate } from "../utils/embeddedNavigate";
 import { formatDateTime } from "../utils/format";
 import prisma from "../db.server";
 
@@ -76,7 +77,7 @@ export default function RunDetail() {
               <s-button
                 type="button"
                 variant="primary"
-                onClick={() => window.location.assign(`/app/runs/${run.id}/review`)}
+                onClick={() => embeddedNavigate(`/app/runs/${run.id}/review`)}
               >
                 Review changes
               </s-button>

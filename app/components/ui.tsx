@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import type { ComponentProps, ReactNode } from "react";
 import { useRevalidator } from "react-router";
 import { computeProgress } from "../domain/progress";
+import { embeddedNavigate } from "../utils/embeddedNavigate";
 import { formatDateTime } from "../utils/format";
 
 type Tone = "auto" | "neutral" | "info" | "success" | "caution" | "warning" | "critical";
@@ -86,7 +87,7 @@ export function EmptyState({
           </div>
         ) : null}
         {action ? (
-          <s-button type="button" variant="primary" onClick={() => window.location.assign(action.href)}>
+          <s-button type="button" variant="primary" onClick={() => embeddedNavigate(action.href)}>
             {action.label}
           </s-button>
         ) : null}

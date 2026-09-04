@@ -4,6 +4,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop } from "../services/shopContext.server";
 import { Callout, EmptyState, runStatusBadge, supplierStatusBadge } from "../components/ui";
+import { embeddedNavigate } from "../utils/embeddedNavigate";
 import { formatDate } from "../utils/format";
 import prisma from "../db.server";
 
@@ -52,7 +53,7 @@ export default function SuppliersIndex() {
         <s-button
           type="button"
           variant="primary"
-          onClick={() => window.location.assign("/app/suppliers/new")}
+          onClick={() => embeddedNavigate("/app/suppliers/new")}
         >
           Add supplier
         </s-button>

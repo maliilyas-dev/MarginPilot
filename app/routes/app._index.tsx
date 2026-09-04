@@ -12,6 +12,7 @@ import {
   TimeAgo,
   runStatusBadge,
 } from "../components/ui";
+import { embeddedNavigate } from "../utils/embeddedNavigate";
 import { formatDateTime, formatNumber } from "../utils/format";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -58,7 +59,7 @@ export default function Home() {
   return (
     <s-page heading="MarginPilot">
       <s-section>
-        <s-button type="button" variant="primary" onClick={() => window.location.assign(data.primaryCta.href)}>
+        <s-button type="button" variant="primary" onClick={() => embeddedNavigate(data.primaryCta.href)}>
           {data.primaryCta.label}
         </s-button>
       </s-section>
@@ -73,7 +74,7 @@ export default function Home() {
             slot="primary-action"
             type="button"
             variant="primary"
-            onClick={() => window.location.assign(data.primaryCta.href)}
+            onClick={() => embeddedNavigate(data.primaryCta.href)}
           >
             {data.primaryCta.label}
           </s-button>
@@ -192,7 +193,7 @@ export default function Home() {
               )}
             </s-text>
           </s-stack>
-          <s-button type="button" onClick={() => window.location.assign("/app/settings")}>
+          <s-button type="button" onClick={() => embeddedNavigate("/app/settings")}>
             Sync catalog in Settings
           </s-button>
         </s-stack>

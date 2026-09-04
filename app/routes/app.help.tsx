@@ -2,6 +2,7 @@ import type { HeadersFunction } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { Callout } from "../components/ui";
+import { embeddedNavigate } from "../utils/embeddedNavigate";
 
 export const loader = async ({ request }: { request: Request }) => {
   await authenticate.admin(request);
@@ -68,7 +69,7 @@ export default function Help() {
   return (
     <s-page heading="Help &amp; docs">
       <s-section>
-        <s-button type="button" variant="primary" onClick={() => window.location.assign("/app/guide")}>
+        <s-button type="button" variant="primary" onClick={() => embeddedNavigate("/app/guide")}>
           Open the guide
         </s-button>
       </s-section>
