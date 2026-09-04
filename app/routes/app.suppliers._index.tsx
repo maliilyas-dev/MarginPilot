@@ -1,5 +1,5 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+import { useLoaderData, useNavigate } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop } from "../services/shopContext.server";
@@ -45,9 +45,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function SuppliersIndex() {
   const { suppliers } = useLoaderData<typeof loader>();
+  const navigate = useNavigate();
   return (
     <s-page heading="Suppliers">
-      <s-button slot="primary-action" href="/app/suppliers/new" variant="primary">
+      <s-button
+        slot="primary-action"
+        type="button"
+        variant="primary"
+        onClick={() => navigate("/app/suppliers/new")}
+      >
         Add supplier
       </s-button>
       {suppliers.length > 0 && (

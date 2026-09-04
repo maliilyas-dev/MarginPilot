@@ -1,5 +1,5 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { useLoaderData, useRouteError, isRouteErrorResponse } from "react-router";
+import { useLoaderData, useNavigate, useRouteError, isRouteErrorResponse } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop } from "../services/shopContext.server";
@@ -36,6 +36,7 @@ const ONBOARDING_STEPS: Array<{ key: string; label: string; href: string }> = [
 
 export default function Home() {
   const { data, error } = useLoaderData<typeof loader>();
+  const navigate = useNavigate();
 
   if (error || !data) {
     return (
@@ -56,7 +57,12 @@ export default function Home() {
 
   return (
     <s-page heading="MarginPilot">
-      <s-button slot="primary-action" href={data.primaryCta.href} variant="primary">
+      <s-button
+        slot="primary-action"
+        type="button"
+        variant="primary"
+        onClick={() => navigate(data.primaryCta.href)}
+      >
         {data.primaryCta.label}
       </s-button>
 
@@ -66,7 +72,12 @@ export default function Home() {
             {doneCount} of {ONBOARDING_STEPS.length} steps complete. Next: {data.primaryCta.label.toLowerCase()}. New to
             MarginPilot? <s-link href="/app/guide">Read the guide</s-link>.
           </s-paragraph>
-          <s-button slot="primary-action" href={data.primaryCta.href} variant="primary">
+          <s-button
+            slot="primary-action"
+            type="button"
+            variant="primary"
+            onClick={() => navigate(data.primaryCta.href)}
+          >
             {data.primaryCta.label}
           </s-button>
         </s-banner>

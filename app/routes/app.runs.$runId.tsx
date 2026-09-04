@@ -1,5 +1,5 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+import { useLoaderData, useNavigate } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop, requireFeedRun } from "../services/shopContext.server";
@@ -63,12 +63,18 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
 export default function RunDetail() {
   const { run, changeSet, failedItems, isActive } = useLoaderData<typeof loader>();
+  const navigate = useNavigate();
   useLiveRefresh(isActive);
 
   return (
     <s-page heading={`Run — ${run.supplier}`}>
       {run.status === "ready_for_review" && (
-        <s-button slot="primary-action" href={`/app/runs/${run.id}/review`} variant="primary">
+        <s-button
+          slot="primary-action"
+          type="button"
+          variant="primary"
+          onClick={() => navigate(`/app/runs/${run.id}/review`)}
+        >
           Review changes
         </s-button>
       )}

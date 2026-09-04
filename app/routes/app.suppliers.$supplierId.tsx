@@ -89,7 +89,12 @@ export default function SupplierDetail() {
 
   return (
     <s-page heading={supplier.name}>
-      <s-button slot="primary-action" href={`/app/suppliers/${supplier.id}/edit`} variant="primary">
+      <s-button
+        slot="primary-action"
+        type="button"
+        variant="primary"
+        onClick={() => navigate(`/app/suppliers/${supplier.id}/edit`)}
+      >
         Edit supplier
       </s-button>
 
