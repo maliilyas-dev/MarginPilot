@@ -57,18 +57,24 @@ export default function Alerts() {
                   <s-stack direction="inline" gap="base">
                     {a.feedRunId && <s-link href={`/app/runs/${a.feedRunId}`}>Open run</s-link>}
                     {a.status !== "read" && a.status !== "resolved" && (
-                      <fetcher.Form method="post" action={`/app/actions/alerts/${a.id}/read`}>
-                        <s-button type="submit" variant="tertiary">
-                          Mark read
-                        </s-button>
-                      </fetcher.Form>
+                      <s-button
+                        type="button"
+                        variant="tertiary"
+                        onClick={() => fetcher.submit({}, { method: "post", action: `/app/actions/alerts/${a.id}/read` })}
+                      >
+                        Mark read
+                      </s-button>
                     )}
                     {a.status !== "resolved" && (
-                      <fetcher.Form method="post" action={`/app/actions/alerts/${a.id}/resolve`}>
-                        <s-button type="submit" variant="tertiary">
-                          Resolve
-                        </s-button>
-                      </fetcher.Form>
+                      <s-button
+                        type="button"
+                        variant="tertiary"
+                        onClick={() =>
+                          fetcher.submit({}, { method: "post", action: `/app/actions/alerts/${a.id}/resolve` })
+                        }
+                      >
+                        Resolve
+                      </s-button>
                     )}
                   </s-stack>
                 </s-stack>
