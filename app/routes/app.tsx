@@ -65,28 +65,37 @@ function mirrorPolarisFields(form: HTMLFormElement): HTMLInputElement[] {
 
 function useSubmitButtonBridge() {
   useEffect(() => {
+    let busy = false;
     const onClick = (event: MouseEvent) => {
-      if (event.defaultPrevented) return;
-      const path = event.composedPath();
-      for (const node of path) {
-        if (!(node instanceof HTMLElement)) continue;
-        const tag = node.tagName.toLowerCase();
-        if (tag === "form") return;
-        const isSubmit =
-          (tag === "s-button" || tag === "button") &&
-          (node.getAttribute("type") === "submit" || node.getAttribute("submit") !== null);
-        if (isSubmit) {
-          if (node.hasAttribute("disabled")) return;
-          const form = node.closest("form");
-          if (form && typeof form.requestSubmit === "function") {
-            event.preventDefault();
-            const mirrors = mirrorPolarisFields(form);
-            form.requestSubmit();
-            // React Router has synchronously read the FormData by now.
-            setTimeout(() => mirrors.forEach((m) => m.remove()), 0);
-          }
-          return;
-        }
+      if (event.defaultPrevented || busy) return;
+      // Find the s-button host in the event path (light DOM, so closest("form") works).
+      const host = event
+        .composedPath()
+        .find(
+          (n): n is HTMLElement =>
+            n instanceof HTMLElement && n.tagName.toLowerCase() === "s-button",
+        );
+      if (!host) return;
+      if (host.hasAttribute("href")) return; // link button
+      const type = host.getAttribute("type");
+      if (type && type !== "submit") return; // reset / plain button
+      if (host.hasAttribute("disabled") || host.hasAttribute("loading")) return;
+      const form = host.closest("form");
+      if (!form || typeof form.requestSubmit !== "function") return;
+      // s-button without type still defaults to "submit" inside a form, matching
+      // native <button> semantics — so an untyped s-button in a form submits it.
+
+      event.preventDefault();
+      busy = true;
+      const mirrors = mirrorPolarisFields(form);
+      try {
+        form.requestSubmit();
+      } finally {
+        // React Router reads FormData synchronously in its submit handler.
+        setTimeout(() => {
+          mirrors.forEach((m) => m.remove());
+          busy = false;
+        }, 0);
       }
     };
     document.addEventListener("click", onClick, true);

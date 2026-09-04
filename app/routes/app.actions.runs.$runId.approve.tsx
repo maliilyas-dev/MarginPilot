@@ -1,4 +1,4 @@
-import type { ActionFunctionArgs } from "react-router";
+import { redirect, type ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { requireShop, requireFeedRun, markOnboarding } from "../services/shopContext.server";
 import { recordAudit } from "../services/audit.server";
@@ -15,9 +15,11 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shop = await requireShop(session);
   const run = await requireFeedRun(shop.id, params.runId!);
+  const backWithError = (message: string) =>
+    redirect(`/app/runs/${run.id}/review?approveError=${encodeURIComponent(message)}`);
 
   if (run.status !== "ready_for_review") {
-    return Response.json({ ok: false, message: "This run is not awaiting review." }, { status: 400 });
+    return backWithError("This run is not awaiting review.");
   }
 
   const form = await request.formData();
@@ -28,13 +30,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const confirmToken = form.get("confirm");
 
   if (!confirmToken) {
-    return Response.json({ ok: false, message: "Confirmation required." }, { status: 400 });
+    return backWithError("Confirmation was missing — please try again.");
   }
   if (proposedChangeIds.length === 0) {
-    return Response.json({ ok: false, message: "Select at least one change." }, { status: 400 });
+    return backWithError("Select at least one row to apply.");
   }
   if (!updateInventory && !updatePrice && !updateUnitCost) {
-    return Response.json({ ok: false, message: "Choose what to update: inventory, price, or both." }, { status: 400 });
+    return backWithError("Choose what to update: price, inventory, or both.");
   }
 
   const changes = await prisma.proposedChange.findMany({
@@ -49,15 +51,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       (c.classification === "safe" || (c.classification === "blocked" && c.overrideApproved)),
   );
   if (selectable.length === 0) {
-    return Response.json(
-      { ok: false, message: "None of the selected rows are safe to apply. Resolve or override blocked rows first." },
-      { status: 400 },
-    );
+    return backWithError("None of the selected rows are safe to apply. Resolve or override blocked rows first.");
   }
 
   const budget = await checkMappedVariantBudget(shop.id, shop.shopDomain, 0);
   if (!budget.allowed) {
-    return Response.json({ ok: false, message: budget.reason }, { status: 400 });
+    return backWithError(budget.reason ?? "Plan limit reached.");
   }
 
   const idempotencyKey = sha256(
@@ -68,7 +67,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   const existing = await prisma.changeSet.findUnique({ where: { idempotencyKey } });
   if (existing) {
-    return Response.json({ ok: true, changeSetId: existing.id, deduped: true });
+    return redirect(`/app/runs/${run.id}`);
   }
 
   const changeSet = await prisma.$transaction(async (tx) => {
@@ -125,7 +124,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     ip: request.headers.get("x-forwarded-for"),
   });
 
-  return Response.json({ ok: true, changeSetId: changeSet.id, redirectTo: `/app/runs/${run.id}` });
+  return redirect(`/app/runs/${run.id}`);
 };
 
 // Resource route: POST only. A loader is required so React Router single-fetch

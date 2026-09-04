@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { useFetcher, useLoaderData } from "react-router";
+import { useFetcher, useLoaderData, useNavigate } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop, requireSupplier } from "../services/shopContext.server";
@@ -53,14 +53,13 @@ export default function SupplierDetail() {
   const upload = useFetcher<{ ok: boolean; message?: string; preview?: unknown[]; headers?: string[]; redirectTo?: string; validation?: { ok: boolean; errors: string[] } }>();
   const test = useFetcher<{ ok: boolean; message?: string; firstHeaderLine?: string; status?: number }>();
   const run = useFetcher<{ ok: boolean; redirectTo?: string; message?: string }>();
-  const [headers, setHeaders] = useState<string[]>(upload.data?.headers ?? []);
+  const [, setHeaders] = useState<string[]>(upload.data?.headers ?? []);
+  const navigate = useNavigate();
 
-  if (upload.data?.redirectTo && typeof window !== "undefined") {
-    window.location.assign(upload.data.redirectTo);
-  }
-  if (run.data?.redirectTo && typeof window !== "undefined") {
-    window.location.assign(run.data.redirectTo);
-  }
+  useEffect(() => {
+    const to = upload.data?.redirectTo ?? run.data?.redirectTo;
+    if (to) navigate(to);
+  }, [upload.data?.redirectTo, run.data?.redirectTo, navigate]);
 
   return (
     <s-page heading={supplier.name}>
@@ -128,15 +127,27 @@ export default function SupplierDetail() {
           encType="multipart/form-data"
         >
           <s-stack direction="block" gap="base">
-            <input type="file" name="file" accept=".csv,text/csv" required
-              onChange={() => setHeaders([])} />
-            <s-text>
-              Map each canonical field to a column name from your CSV. Required:{" "}
-              {REQUIRED_FIELDS.map((f) => FIELD_LABELS[f]).join(", ")}.
+            <div>
+              <label
+                htmlFor="feed-file"
+                style={{ display: "block", fontWeight: 600, marginBottom: 4, fontSize: 13 }}
+              >
+                CSV file
+              </label>
+              <input
+                id="feed-file"
+                type="file"
+                name="file"
+                accept=".csv,text/csv"
+                required
+                onChange={() => setHeaders([])}
+              />
+            </div>
+            <s-text color="subdued">
+              Map each field to a column header from your CSV. Required:{" "}
+              {REQUIRED_FIELDS.map((f) => FIELD_LABELS[f]).join(", ")}. Leave every box blank to reuse this
+              supplier&rsquo;s saved mapping.
             </s-text>
-            {(headers.length ? headers : Object.values(mapping)).length === 0 && (
-              <s-text>Tip: leave mapping blank to reuse this supplier&rsquo;s saved profile.</s-text>
-            )}
             <s-stack direction="block" gap="small-300">
               {ALL_FIELDS.map((field) => (
                 <s-text-field
@@ -167,9 +178,44 @@ export default function SupplierDetail() {
           </s-banner>
         )}
         {upload.data?.ok && upload.data.preview && (
-          <s-banner tone="success">
-            Parsed {upload.data.preview.length} preview rows. {upload.data.validation?.ok ? "Mapping looks valid." : "Fix mapping issues above."}
-          </s-banner>
+          <s-stack direction="block" gap="base">
+            <s-banner tone={upload.data.validation?.ok ? "success" : "warning"}>
+              Parsed {upload.data.preview.length} preview row(s).{" "}
+              {upload.data.validation?.ok
+                ? "Mapping looks valid — tick “Process this feed now” and upload again to run it."
+                : "Fix the mapping issues above, then upload again."}
+            </s-banner>
+            {upload.data.preview.length > 0 && (
+              <div style={{ overflowX: "auto" }}>
+                <s-table>
+                  <s-table-header-row>
+                    <s-table-header>#</s-table-header>
+                    <s-table-header>Supplier SKU</s-table-header>
+                    <s-table-header>Qty</s-table-header>
+                    <s-table-header>Unit cost</s-table-header>
+                    <s-table-header>Name</s-table-header>
+                    <s-table-header>Valid?</s-table-header>
+                  </s-table-header-row>
+                  <s-table-body>
+                    {(upload.data.preview as Array<Record<string, unknown>>).slice(0, 20).map((row, i) => (
+                      <s-table-row key={i}>
+                        <s-table-cell>{i + 1}</s-table-cell>
+                        <s-table-cell>{String(row.supplierSkuOriginal ?? "—")}</s-table-cell>
+                        <s-table-cell>{row.quantity == null ? "—" : String(row.quantity)}</s-table-cell>
+                        <s-table-cell>{row.unitCost == null ? "—" : String(row.unitCost)}</s-table-cell>
+                        <s-table-cell>{String(row.supplierName ?? "—")}</s-table-cell>
+                        <s-table-cell>
+                          <s-badge tone={row.validationStatus === "valid" ? "success" : "critical"}>
+                            {String(row.validationStatus ?? "?")}
+                          </s-badge>
+                        </s-table-cell>
+                      </s-table-row>
+                    ))}
+                  </s-table-body>
+                </s-table>
+              </div>
+            )}
+          </s-stack>
         )}
       </s-section>
 

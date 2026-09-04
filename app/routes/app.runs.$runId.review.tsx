@@ -1,16 +1,17 @@
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Form, useFetcher, useLoaderData, useSearchParams } from "react-router";
+import { Form, useFetcher, useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop, requireFeedRun } from "../services/shopContext.server";
 import { recordAudit } from "../services/audit.server";
 import { describeReason, type ReasonCodeValue } from "../domain/safety/reasonCodes";
-import { StatCard, StatGrid, classificationBadge } from "../components/ui";
+import { Callout, StatCard, StatGrid, classificationBadge, useLiveRefresh } from "../components/ui";
 import prisma from "../db.server";
 
 const FILTERS = ["all", "safe", "warning", "blocked", "unmatched", "invalid", "unchanged"] as const;
 type Filter = (typeof FILTERS)[number];
 const PAGE_SIZE = 100;
+const ACTIVE = ["queued", "fetching", "parsing", "validating", "mapping", "calculating", "applying"];
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -20,6 +21,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const filter = (url.searchParams.get("filter") as Filter) || "all";
   const page = Math.max(1, Number(url.searchParams.get("page") || 1));
+  const approveError = url.searchParams.get("approveError");
 
   const where = {
     feedRunId: run.id,
@@ -52,7 +54,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   return {
-    run: { id: run.id, status: run.status, blocked: run.blockedCount },
+    run: { id: run.id, status: run.status, blocked: run.blockedCount, active: ACTIVE.includes(run.status) },
+    approveError,
     filter,
     page,
     total,
@@ -109,29 +112,63 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   return Response.json({ ok: false, message: "Unknown action." }, { status: 400 });
 };
 
+const CLASSES = ["safe", "warning", "blocked", "unmatched", "invalid", "unchanged"] as const;
+const toneFor: Record<string, "success" | "warning" | "critical" | "neutral"> = {
+  safe: "success",
+  warning: "warning",
+  blocked: "critical",
+  unmatched: "neutral",
+  invalid: "critical",
+  unchanged: "neutral",
+};
+
 export default function Review() {
   const data = useLoaderData<typeof loader>();
-  const [sp] = useSearchParams();
   const override = useFetcher();
+  useLiveRefresh(data.run.active);
 
-  const CLASSES = ["safe", "warning", "blocked", "unmatched", "invalid", "unchanged"] as const;
-  const toneFor: Record<string, "success" | "warning" | "critical" | "neutral"> = {
-    safe: "success",
-    warning: "warning",
-    blocked: "critical",
-    unmatched: "neutral",
-    invalid: "critical",
-    unchanged: "neutral",
+  const doOverride = (proposedChangeId: string) => {
+    override.submit(
+      { intent: "override", proposedChangeId, confirm: "yes" },
+      { method: "post", action: `/app/runs/${data.run.id}/review` },
+    );
   };
+
+  const ready = data.run.status === "ready_for_review";
 
   return (
     <s-page heading="Review changes">
+      {data.run.active && !ready ? (
+        <s-section>
+          <Callout tone="info" icon="clock" title="Still processing">
+            MarginPilot is still calculating this run. This page will refresh automatically when it&apos;s ready.
+          </Callout>
+        </s-section>
+      ) : null}
+
+      {data.approveError ? (
+        <s-section>
+          <s-banner tone="critical" heading="Could not approve">
+            <s-paragraph>{data.approveError}</s-paragraph>
+          </s-banner>
+        </s-section>
+      ) : null}
+
       <s-section>
+        <Callout tone="info" icon="view" title="How to approve">
+          Everything below is a <s-text type="strong">preview</s-text> — nothing reaches Shopify yet. Safe rows are
+          pre-selected. Tick the boxes for the rows you want, choose whether to update price, inventory or both at the
+          bottom, then <s-text type="strong">Approve selected changes</s-text>. Blocked rows can&apos;t be selected until
+          you fix the data or override them individually.
+        </Callout>
+      </s-section>
+
+      <s-section heading="Summary">
         {data.run.blocked > 0 && (
           <s-banner tone="warning" heading={`${data.run.blocked} row(s) blocked by a safety policy`}>
             <s-paragraph>
-              Blocked rows cannot be selected. Fix the supplier data and re-run, or override a specific row (logged, needs
-              confirmation).
+              Blocked rows cannot be selected. Fix the supplier data and re-run, or override a specific row below (each
+              override is logged).
             </s-paragraph>
           </s-banner>
         )}
@@ -151,7 +188,7 @@ export default function Review() {
 
       <s-section heading="Financial exposure">
         <s-stack direction="block" gap="small-200">
-          <span style={{ fontSize: "1.6rem", fontWeight: 650 }}>
+          <span style={{ fontSize: "1.6rem", fontWeight: 650, letterSpacing: "-0.01em" }}>
             {data.exposure.priceDelta >= 0 ? "+" : "−"}
             {Math.abs(data.exposure.priceDelta).toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </span>
@@ -179,65 +216,76 @@ export default function Review() {
 
       <Form method="post" action={`/app/actions/runs/${data.run.id}/approve`}>
         <s-section>
-          <s-table>
-            <s-table-header-row>
-              <s-table-header>Pick</s-table-header>
-              <s-table-header>Row</s-table-header>
-              <s-table-header>Supplier SKU</s-table-header>
-              <s-table-header>Shopify variant</s-table-header>
-              <s-table-header>Inv before → after</s-table-header>
-              <s-table-header>Price before → recommended</s-table-header>
-              <s-table-header>Landed / margin</s-table-header>
-              <s-table-header>Status</s-table-header>
-              <s-table-header>Reasons</s-table-header>
-            </s-table-header-row>
-            <s-table-body>
-              {data.rows.map((r) => (
-                <s-table-row key={r.id}>
-                  <s-table-cell>
-                    <input
-                      type="checkbox"
-                      name="proposedChangeId"
-                      value={r.id}
-                      disabled={!r.selectable}
-                      defaultChecked={r.classification === "safe"}
-                    />
-                  </s-table-cell>
-                  <s-table-cell>{r.row}</s-table-cell>
-                  <s-table-cell>{r.sku}</s-table-cell>
-                  <s-table-cell>{r.variant ?? "—"}</s-table-cell>
-                  <s-table-cell>
-                    {r.currentQuantity ?? "—"} → {r.proposedQuantity ?? "—"}
-                  </s-table-cell>
-                  <s-table-cell>
-                    {r.currentPrice ?? "—"} → {r.recommendedPrice ?? "—"}
-                  </s-table-cell>
-                  <s-table-cell>
-                    {r.landedCost ?? "—"} / {r.recommendedMarginPercent ? `${r.recommendedMarginPercent}%` : "—"}
-                  </s-table-cell>
-                  <s-table-cell>
-                    {classificationBadge(r.classification)}
-                    {r.classification === "blocked" && !r.overrideApproved && (
-                      <override.Form method="post" action={`/app/runs/${data.run.id}/review${sp.toString() ? `?${sp}` : ""}`}>
-                        <input type="hidden" name="intent" value="override" />
-                        <input type="hidden" name="proposedChangeId" value={r.id} />
-                        <input type="hidden" name="confirm" value="yes" />
-                        <s-button type="submit" variant="tertiary">
-                          Override
-                        </s-button>
-                      </override.Form>
-                    )}
-                  </s-table-cell>
-                  <s-table-cell>{r.reasons.join("; ")}</s-table-cell>
-                </s-table-row>
-              ))}
-            </s-table-body>
-          </s-table>
+          <div style={{ overflowX: "auto" }}>
+            <s-table>
+              <s-table-header-row>
+                <s-table-header>Pick</s-table-header>
+                <s-table-header>Row</s-table-header>
+                <s-table-header>Supplier SKU</s-table-header>
+                <s-table-header>Shopify variant</s-table-header>
+                <s-table-header>Inventory</s-table-header>
+                <s-table-header>Price → recommended</s-table-header>
+                <s-table-header>Landed / margin</s-table-header>
+                <s-table-header>Status</s-table-header>
+                <s-table-header>Why</s-table-header>
+              </s-table-header-row>
+              <s-table-body>
+                {data.rows.map((r) => (
+                  <s-table-row key={r.id}>
+                    <s-table-cell>
+                      <input
+                        type="checkbox"
+                        name="proposedChangeId"
+                        value={r.id}
+                        disabled={!r.selectable}
+                        defaultChecked={r.classification === "safe"}
+                        aria-label={`Select row ${r.row}`}
+                      />
+                    </s-table-cell>
+                    <s-table-cell>{r.row}</s-table-cell>
+                    <s-table-cell>
+                      <s-text type="strong">{r.sku ?? "—"}</s-text>
+                    </s-table-cell>
+                    <s-table-cell>{r.variant ?? <s-text color="subdued">Unmatched</s-text>}</s-table-cell>
+                    <s-table-cell>
+                      {r.currentQuantity ?? "—"} → {r.proposedQuantity ?? "—"}
+                    </s-table-cell>
+                    <s-table-cell>
+                      {r.currentPrice ?? "—"} → <s-text type="strong">{r.recommendedPrice ?? "—"}</s-text>
+                    </s-table-cell>
+                    <s-table-cell>
+                      {r.landedCost ?? "—"} / {r.recommendedMarginPercent ? `${r.recommendedMarginPercent}%` : "—"}
+                    </s-table-cell>
+                    <s-table-cell>
+                      <s-stack direction="block" gap="small-300">
+                        {classificationBadge(r.classification)}
+                        {r.classification === "blocked" && !r.overrideApproved && (
+                          <s-button
+                            type="button"
+                            variant="tertiary"
+                            onClick={() => doOverride(r.id)}
+                            {...(override.state !== "idle" ? { loading: true } : {})}
+                          >
+                            Override
+                          </s-button>
+                        )}
+                      </s-stack>
+                    </s-table-cell>
+                    <s-table-cell>
+                      <s-text color="subdued">{r.reasons.join("; ")}</s-text>
+                    </s-table-cell>
+                  </s-table-row>
+                ))}
+              </s-table-body>
+            </s-table>
+          </div>
 
           {data.totalPages > 1 && (
             <s-stack direction="inline" gap="base">
               {data.page > 1 && (
-                <s-link href={`/app/runs/${data.run.id}/review?filter=${data.filter}&page=${data.page - 1}`}>Previous</s-link>
+                <s-link href={`/app/runs/${data.run.id}/review?filter=${data.filter}&page=${data.page - 1}`}>
+                  Previous
+                </s-link>
               )}
               <s-text>
                 Page {data.page} of {data.totalPages}
@@ -263,7 +311,7 @@ export default function Review() {
               <s-checkbox name="updateUnitCost" value="on" label="Update unit cost (if authorized)" />
             </s-stack>
             <input type="hidden" name="confirm" value="yes" />
-            <s-button type="submit" variant="primary" disabled={data.run.status !== "ready_for_review"}>
+            <s-button type="submit" variant="primary" disabled={!ready}>
               Approve selected changes
             </s-button>
           </s-stack>
