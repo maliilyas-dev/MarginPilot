@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { useFetcher, useLoaderData, useNavigate } from "react-router";
+import { useFetcher, useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop, requireSupplier } from "../services/shopContext.server";
@@ -56,7 +56,6 @@ export default function SupplierDetail() {
   const test = useFetcher<{ ok: boolean; message?: string; firstHeaderLine?: string; status?: number }>();
   const run = useFetcher<{ ok: boolean; redirectTo?: string; message?: string }>();
   const [, setHeaders] = useState<string[]>(upload.data?.headers ?? []);
-  const navigate = useNavigate();
   const uploadRef = useRef<HTMLDivElement>(null);
 
   const submitUpload = () => {
@@ -85,8 +84,8 @@ export default function SupplierDetail() {
 
   useEffect(() => {
     const to = upload.data?.redirectTo ?? run.data?.redirectTo;
-    if (to) navigate(to);
-  }, [upload.data?.redirectTo, run.data?.redirectTo, navigate]);
+    if (to) window.location.assign(to);
+  }, [upload.data?.redirectTo, run.data?.redirectTo]);
 
   return (
     <s-page heading={supplier.name}>
@@ -101,7 +100,7 @@ export default function SupplierDetail() {
             <s-button
               type="button"
               variant="primary"
-              onClick={() => navigate(`/app/suppliers/${supplier.id}/edit`)}
+              onClick={() => window.location.assign(`/app/suppliers/${supplier.id}/edit`)}
             >
               Edit supplier
             </s-button>

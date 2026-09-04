@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from "react";
 import type { ComponentProps, ReactNode } from "react";
-import { useNavigate, useRevalidator } from "react-router";
+import { useRevalidator } from "react-router";
 import { computeProgress } from "../domain/progress";
 import { formatDateTime } from "../utils/format";
 
@@ -73,7 +73,6 @@ export function EmptyState({
   children?: ReactNode;
   action?: { label: string; href: string };
 }) {
-  const navigate = useNavigate();
   return (
     <s-box padding="large-500" borderRadius="base">
       <s-stack direction="block" gap="base" alignItems="center">
@@ -87,7 +86,7 @@ export function EmptyState({
           </div>
         ) : null}
         {action ? (
-          <s-button type="button" variant="primary" onClick={() => navigate(action.href)}>
+          <s-button type="button" variant="primary" onClick={() => window.location.assign(action.href)}>
             {action.label}
           </s-button>
         ) : null}

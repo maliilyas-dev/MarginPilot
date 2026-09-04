@@ -1,5 +1,4 @@
 import type { HeadersFunction } from "react-router";
-import { useNavigate } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { Callout } from "../components/ui";
@@ -66,11 +65,10 @@ const FAQ: Array<{ q: string; a: string }> = [
 ];
 
 export default function Help() {
-  const navigate = useNavigate();
   return (
     <s-page heading="Help &amp; docs">
       <s-section>
-        <s-button type="button" variant="primary" onClick={() => navigate("/app/guide")}>
+        <s-button type="button" variant="primary" onClick={() => window.location.assign("/app/guide")}>
           Open the guide
         </s-button>
       </s-section>
