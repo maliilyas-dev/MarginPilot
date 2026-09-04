@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { redirect, useFetcher, useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -21,7 +21,7 @@ const schema = z.object({
   delimiter: z.enum(["auto", "comma", "semicolon", "tab", "pipe"]),
   decimalSeparator: z.enum(["dot", "comma"]),
   thousandsSeparator: z.string().max(2).optional(),
-  currencyCode: z.string().length(3).optional(),
+  currencyCode: z.string().length(3).optional().or(z.literal("")),
   schedule: z.enum(["manual", "hourly", "every_6_hours", "daily"]),
   timezone: z.string().max(60).optional(),
   defaultLocationGid: z.string().optional(),
@@ -119,18 +119,52 @@ export default function NewSupplier() {
   const errors = (actionData?.errors ?? {}) as Record<string, string[]>;
   const [feedType, setFeedType] = useState<"upload_csv" | "url_csv">("upload_csv");
   const isUrl = feedType === "url_csv";
+  const rootRef = useRef<HTMLDivElement>(null);
+  const submitting = fetcher.state !== "idle";
+
+  // Read every field's live value straight off the DOM at submit time and post
+  // it as an explicit payload — no dependence on Polaris fields feeding native
+  // FormData, no submit-button event, no form element at all.
+  const submit = () => {
+    const root = rootRef.current;
+    if (!root) return;
+    const val = (name: string) => {
+      const el = root.querySelector(`[name="${name}"]`) as (HTMLElement & { value?: unknown }) | null;
+      return el?.value == null ? "" : String(el.value);
+    };
+    const checked = (name: string) => {
+      const el = root.querySelector(`[name="${name}"]`) as (HTMLElement & { checked?: boolean }) | null;
+      return el?.checked ? "on" : "";
+    };
+    fetcher.submit(
+      {
+        name: val("name"),
+        code: val("code"),
+        feedType,
+        feedUrl: val("feedUrl"),
+        basicUser: val("basicUser"),
+        basicPass: val("basicPass"),
+        delimiter: val("delimiter") || "auto",
+        decimalSeparator: val("decimalSeparator") || "dot",
+        thousandsSeparator: val("thousandsSeparator"),
+        currencyCode: val("currencyCode"),
+        schedule: val("schedule") || "manual",
+        timezone: val("timezone") || timezone,
+        defaultLocationGid: val("defaultLocationGid"),
+        barcodeMatching: checked("barcodeMatching"),
+      },
+      { method: "post" },
+    );
+  };
 
   return (
     <s-page heading="Add supplier">
-      <s-button slot="primary-action" href="/app/suppliers" variant="tertiary">
-        Cancel
-      </s-button>
       {errors._form && (
         <s-section>
           <s-banner tone="critical">{errors._form.join(" ")}</s-banner>
         </s-section>
       )}
-      <fetcher.Form method="post">
+      <div ref={rootRef}>
         <s-section heading="Identity">
           <s-stack direction="block" gap="base">
             <s-text-field
@@ -282,12 +316,20 @@ export default function NewSupplier() {
               label="Also match by barcode when the SKU doesn't match"
               details="MarginPilot always tries exact SKU first. Enable this to fall back to an exact barcode match. It never matches on product title."
             />
-            <s-button type="submit" variant="primary">
-              Create supplier
-            </s-button>
+            <s-stack direction="inline" gap="base" alignItems="center">
+              <s-button
+                type="button"
+                variant="primary"
+                onClick={submit}
+                {...(submitting ? { loading: true } : {})}
+              >
+                {submitting ? "Creating…" : "Create supplier"}
+              </s-button>
+              <s-link href="/app/suppliers">Cancel</s-link>
+            </s-stack>
           </s-stack>
         </s-section>
-      </fetcher.Form>
+      </div>
 
       <s-section slot="aside" heading="What happens next">
         <s-stack direction="block" gap="small-300">
