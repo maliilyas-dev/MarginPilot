@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { useFetcher, useLoaderData } from "react-router";
-import { readFields } from "../components/domForm";
+import { readFields, sanitizeShopifyGid } from "../components/domForm";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { z } from "zod";
 import { authenticate } from "../shopify.server";
@@ -97,8 +97,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     if (d.intent === "location") {
-      await prisma.shop.update({ where: { id: shop.id }, data: { defaultLocationGid: d.defaultLocationGid || null } });
-      await markOnboarding(shop.id, { selectedLocation: Boolean(d.defaultLocationGid) });
+      const locationGid = sanitizeShopifyGid(d.defaultLocationGid, "Location");
+      await prisma.shop.update({ where: { id: shop.id }, data: { defaultLocationGid: locationGid } });
+      await markOnboarding(shop.id, { selectedLocation: Boolean(locationGid) });
       await recordAudit({ shopId: shop.id, actorType: "merchant", action: "default_location_set", resourceType: "shop", resourceId: shop.id, summary: "Default inventory location updated." });
       return { ok: true };
     }

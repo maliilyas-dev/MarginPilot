@@ -8,6 +8,21 @@
  */
 export type FieldKind = "text" | "check";
 
+/**
+ * A `<s-select>` whose "none/default" option has `value=""` can, on some
+ * Polaris versions, report something other than an empty string for
+ * `.value` when that option is selected (observed: a stray non-empty
+ * string). That's silently corrupting for fields with no DB constraint to
+ * catch it (a Shopify GID) and a thrown foreign-key error for fields that
+ * reference another table. Use this to only accept values that actually
+ * look like the Shopify GID they're supposed to be.
+ */
+export function sanitizeShopifyGid(value: string | null | undefined, resource?: string): string | null {
+  if (!value) return null;
+  const prefix = resource ? `gid://shopify/${resource}/` : "gid://shopify/";
+  return value.startsWith(prefix) ? value : null;
+}
+
 export function readFields(
   root: HTMLElement | null,
   spec: Record<string, FieldKind>,

@@ -73,10 +73,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return { error: "Minimum margin percent must be less than 100." };
     }
 
+    // Trust nothing from the client for the FK: only accept a supplierId that
+    // is actually this shop's. Anything else (including a stray non-empty
+    // value from the "All suppliers" option) becomes shop-wide (null).
+    let supplierId: string | null = null;
+    if (d.supplierId) {
+      const owned = await prisma.supplier.findFirst({ where: { id: d.supplierId, shopId: shop.id }, select: { id: true } });
+      supplierId = owned?.id ?? null;
+    }
+
     const rule = await prisma.pricingRule.create({
       data: {
         shopId: shop.id,
-        supplierId: d.supplierId || null,
+        supplierId,
         name: d.name || "Rule",
         priority: d.priority ?? 100,
         vendorFilter: d.vendorFilter || null,

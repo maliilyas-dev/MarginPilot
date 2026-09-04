@@ -9,6 +9,7 @@ import { canAddSupplier, canUseUrlFeed, canUseSchedule } from "../services/entit
 import { encryptCredentials } from "../services/encryption.server";
 import { recordAudit, hashIp } from "../services/audit.server";
 import { Callout } from "../components/ui";
+import { sanitizeShopifyGid } from "../components/domForm";
 import prisma from "../db.server";
 
 const schema = z.object({
@@ -92,7 +93,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         currencyCode: d.currencyCode || shop.currencyCode,
         schedule: d.schedule,
         timezone: d.timezone || shop.timezone,
-        defaultLocationGid: d.defaultLocationGid || shop.defaultLocationGid,
+        defaultLocationGid: sanitizeShopifyGid(d.defaultLocationGid, "Location") || shop.defaultLocationGid,
         barcodeMatching: d.barcodeMatching === "on",
       },
     });
