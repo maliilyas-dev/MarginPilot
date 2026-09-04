@@ -1,5 +1,7 @@
+import { useRef } from "react";
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { useFetcher, useLoaderData } from "react-router";
+import { readFields } from "../components/domForm";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { z } from "zod";
 import { authenticate } from "../shopify.server";
@@ -116,9 +118,30 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function Settings() {
   const { shop, locations, safety, lastSync, variantCount } = useLoaderData<typeof loader>();
   const sync = useFetcher<{ ok: boolean; catalogSyncId?: string; alreadyRunning?: boolean; message?: string }>();
-  const save = useFetcher<{ ok?: boolean; error?: string }>();
+  const saveLocation = useFetcher<{ ok?: boolean; error?: string }>();
+  const saveSafety = useFetcher<{ ok?: boolean; error?: string }>();
   const syncActive = Boolean(lastSync?.active) || sync.state !== "idle";
   useLiveRefresh(syncActive);
+
+  const locationRef = useRef<HTMLDivElement>(null);
+  const safetyRef = useRef<HTMLDivElement>(null);
+
+  const submitLocation = () => {
+    const f = readFields(locationRef.current, { defaultLocationGid: "text" });
+    saveLocation.submit({ intent: "location", ...f }, { method: "post" });
+  };
+  const submitSafety = () => {
+    const f = readFields(safetyRef.current, {
+      maxPriceDecreasePercent: "text",
+      maxPriceIncreasePercent: "text",
+      maxInventoryChangePercent: "text",
+      maxInventoryAbsoluteChange: "text",
+      maxInvalidRowPercent: "text",
+      maxRowCountDecreasePercent: "text",
+      allowZeroCost: "check",
+    });
+    saveSafety.submit({ intent: "safety", ...f }, { method: "post" });
+  };
 
   return (
     <s-page heading="Settings">
@@ -164,16 +187,14 @@ export default function Settings() {
             </s-banner>
           ) : null}
 
-          <sync.Form method="post">
-            <input type="hidden" name="intent" value="catalog-sync" />
-            <s-button
-              type="submit"
-              variant="primary"
-              {...(sync.state !== "idle" || lastSync?.active ? { loading: true } : {})}
-            >
-              {lastSync?.active ? "Sync running…" : "Sync catalog now"}
-            </s-button>
-          </sync.Form>
+          <s-button
+            type="button"
+            variant="primary"
+            onClick={() => sync.submit({ intent: "catalog-sync" }, { method: "post" })}
+            {...(sync.state !== "idle" || lastSync?.active ? { loading: true } : {})}
+          >
+            {lastSync?.active ? "Sync running…" : "Sync catalog now"}
+          </s-button>
           {sync.data?.ok && !lastSync?.active && (
             <s-banner tone="success">
               {sync.data.alreadyRunning ? "A sync is already running." : "Catalog sync queued — it runs in the background."}
@@ -184,8 +205,7 @@ export default function Settings() {
       </s-section>
 
       <s-section heading="Default inventory location">
-        <save.Form method="post">
-          <input type="hidden" name="intent" value="location" />
+        <div ref={locationRef}>
           <s-stack direction="block" gap="base">
             <s-select
               label="Location"
@@ -203,11 +223,17 @@ export default function Settings() {
             <s-text color="subdued">
               Currency: {shop.currencyCode} · Time zone: {shop.timezone}
             </s-text>
-            <s-button type="submit" variant="primary">
+            <s-button
+              type="button"
+              variant="primary"
+              onClick={submitLocation}
+              {...(saveLocation.state !== "idle" ? { loading: true } : {})}
+            >
               Save location
             </s-button>
+            {saveLocation.data?.error && <s-banner tone="critical">{saveLocation.data.error}</s-banner>}
           </s-stack>
-        </save.Form>
+        </div>
       </s-section>
 
       <s-section heading="Safety policy">
@@ -215,8 +241,7 @@ export default function Settings() {
           A row that exceeds any limit is marked <s-text type="strong">blocked</s-text> and cannot be applied until you
           fix the data or override that single row. Run-level limits can stop a whole feed.
         </Callout>
-        <save.Form method="post">
-          <input type="hidden" name="intent" value="safety" />
+        <div ref={safetyRef}>
           <s-stack direction="block" gap="base">
             <s-text color="subdued">Per-row limits — a row past any of these is blocked.</s-text>
             <s-number-field
@@ -264,11 +289,17 @@ export default function Settings() {
               details="Off by default — a $0 cost is usually a feed error and is blocked."
               {...(safety?.allowZeroCost ? { checked: true } : {})}
             />
-            <s-button type="submit" variant="primary">
+            <s-button
+              type="button"
+              variant="primary"
+              onClick={submitSafety}
+              {...(saveSafety.state !== "idle" ? { loading: true } : {})}
+            >
               Save safety policy
             </s-button>
+            {saveSafety.data?.error && <s-banner tone="critical">{saveSafety.data.error}</s-banner>}
           </s-stack>
-        </save.Form>
+        </div>
       </s-section>
 
       <s-section slot="aside" heading="Billing">

@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { redirect, useFetcher, useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -7,6 +8,7 @@ import { requireShop, requireSupplier } from "../services/shopContext.server";
 import { canUseSchedule } from "../services/entitlements.server";
 import { encryptCredentials } from "../services/encryption.server";
 import { recordAudit } from "../services/audit.server";
+import { readFields } from "../components/domForm";
 import prisma from "../db.server";
 
 const schema = z.object({
@@ -78,17 +80,36 @@ export default function EditSupplier() {
   const { supplier } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const actionData = fetcher.data;
+  const rootRef = useRef<HTMLDivElement>(null);
+  const saving = fetcher.state !== "idle";
+
+  const save = () => {
+    const root = rootRef.current;
+    if (!root) return;
+    const f = readFields(root, {
+      name: "text",
+      status: "text",
+      feedUrl: "text",
+      basicUser: "text",
+      basicPass: "text",
+      delimiter: "text",
+      decimalSeparator: "text",
+      thousandsSeparator: "text",
+      schedule: "text",
+      timezone: "text",
+      barcodeMatching: "check",
+    });
+    fetcher.submit(f, { method: "post" });
+  };
+
   return (
     <s-page heading={`Edit ${supplier.name}`}>
-      <s-button slot="primary-action" href={`/app/suppliers/${supplier.id}`} variant="tertiary">
-        Cancel
-      </s-button>
       {actionData?.error && (
         <s-section>
           <s-banner tone="critical">{actionData.error}</s-banner>
         </s-section>
       )}
-      <fetcher.Form method="post">
+      <div ref={rootRef}>
         <s-section heading="Identity">
           <s-stack direction="block" gap="base">
             <s-text-field label="Supplier name" name="name" defaultValue={supplier.name} required />
@@ -155,12 +176,15 @@ export default function EditSupplier() {
               details="Exact SKU is always tried first. Never matches on product title."
               {...(supplier.barcodeMatching ? { checked: true } : {})}
             />
-            <s-button type="submit" variant="primary">
-              Save changes
-            </s-button>
+            <s-stack direction="inline" gap="base" alignItems="center">
+              <s-button type="button" variant="primary" onClick={save} {...(saving ? { loading: true } : {})}>
+                {saving ? "Saving…" : "Save changes"}
+              </s-button>
+              <s-link href={`/app/suppliers/${supplier.id}`}>Cancel</s-link>
+            </s-stack>
           </s-stack>
         </s-section>
-      </fetcher.Form>
+      </div>
 
       <s-section slot="aside" heading="Good to know">
         <s-stack direction="block" gap="small-300">
