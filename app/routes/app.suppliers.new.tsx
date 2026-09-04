@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Form, redirect, useActionData, useLoaderData } from "react-router";
+import { redirect, useFetcher, useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { z } from "zod";
 import { authenticate } from "../shopify.server";
@@ -114,7 +114,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export default function NewSupplier() {
   const { locations, timezone } = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
+  const fetcher = useFetcher<typeof action>();
+  const actionData = fetcher.data;
   const errors = (actionData?.errors ?? {}) as Record<string, string[]>;
   const [feedType, setFeedType] = useState<"upload_csv" | "url_csv">("upload_csv");
   const isUrl = feedType === "url_csv";
@@ -129,7 +130,7 @@ export default function NewSupplier() {
           <s-banner tone="critical">{errors._form.join(" ")}</s-banner>
         </s-section>
       )}
-      <Form method="post">
+      <fetcher.Form method="post">
         <s-section heading="Identity">
           <s-stack direction="block" gap="base">
             <s-text-field
@@ -286,7 +287,7 @@ export default function NewSupplier() {
             </s-button>
           </s-stack>
         </s-section>
-      </Form>
+      </fetcher.Form>
 
       <s-section slot="aside" heading="What happens next">
         <s-stack direction="block" gap="small-300">

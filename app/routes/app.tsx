@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Outlet, useLoaderData, useRouteError, useSubmit } from "react-router";
+import { Outlet, useLoaderData, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { NavMenu } from "@shopify/app-bridge-react";
@@ -28,7 +28,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
  * `fetch` to attach `Authorization: Bearer <sessionToken>`.
  */
 function useSubmitButtonBridge() {
-  const submit = useSubmit();
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
       if (event.defaultPrevented) return;
@@ -43,12 +42,14 @@ function useSubmitButtonBridge() {
         if (isSubmit) {
           if (node.hasAttribute("disabled")) return;
           const form = node.closest("form");
-          if (form) {
+          if (form && typeof form.requestSubmit === "function") {
+            // Stop the click's default (nothing happens for s-button anyway) and
+            // fire a real submit event so the form's own React Router / fetcher
+            // onSubmit handler runs — that path goes through App Bridge's patched
+            // fetch and attaches the session token. Do NOT stopPropagation:
+            // App Bridge needs to observe the event.
             event.preventDefault();
-            // navigate:false runs the submission through an internal fetcher,
-            // the code path App Bridge intercepts to attach the session token.
-            // Redirects returned by actions are still followed.
-            submit(form, { navigate: false });
+            form.requestSubmit();
           }
           return;
         }
@@ -56,7 +57,7 @@ function useSubmitButtonBridge() {
     };
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
-  }, [submit]);
+  }, []);
 }
 
 export default function App() {
