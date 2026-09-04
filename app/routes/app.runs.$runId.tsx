@@ -69,20 +69,19 @@ export default function RunDetail() {
 
   return (
     <s-page heading={`Run — ${run.supplier}`}>
-      {run.status === "ready_for_review" && (
-        <s-button
-          slot="primary-action"
-          type="button"
-          variant="primary"
-          onClick={() => navigate(`/app/runs/${run.id}/review`)}
-        >
-          Review changes
-        </s-button>
-      )}
       <s-section heading="Status">
         <s-stack direction="block" gap="base">
           <s-stack direction="inline" gap="base" alignItems="center">
             {runStatusBadge(run.status)}
+            {run.status === "ready_for_review" && (
+              <s-button
+                type="button"
+                variant="primary"
+                onClick={() => navigate(`/app/runs/${run.id}/review`)}
+              >
+                Review changes
+              </s-button>
+            )}
           </s-stack>
           {isActive ? (
             <JobProgress

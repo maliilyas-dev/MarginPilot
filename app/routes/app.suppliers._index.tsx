@@ -49,14 +49,15 @@ export default function SuppliersIndex() {
   const navigate = useNavigate();
   return (
     <s-page heading="Suppliers">
-      <s-button
-        slot="primary-action"
-        type="button"
-        variant="primary"
-        onClick={() => navigate("/app/suppliers/new")}
-      >
-        Add supplier
-      </s-button>
+      <s-section>
+        <s-button
+          type="button"
+          variant="primary"
+          onClick={() => navigate("/app/suppliers/new")}
+        >
+          Add supplier
+        </s-button>
+      </s-section>
       {suppliers.length > 0 && (
         <s-section>
           <Callout tone="info" icon="store" title="One supplier per distributor or vendor">

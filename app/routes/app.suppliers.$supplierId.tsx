@@ -90,15 +90,6 @@ export default function SupplierDetail() {
 
   return (
     <s-page heading={supplier.name}>
-      <s-button
-        slot="primary-action"
-        type="button"
-        variant="primary"
-        onClick={() => navigate(`/app/suppliers/${supplier.id}/edit`)}
-      >
-        Edit supplier
-      </s-button>
-
       <s-section heading="Overview">
         <s-stack direction="block" gap="base">
           <s-stack direction="inline" gap="small-200" alignItems="center">
@@ -107,6 +98,13 @@ export default function SupplierDetail() {
               {supplier.feedType === "url_csv" ? "Scheduled URL CSV" : "Manual CSV upload"}
             </s-badge>
             <s-badge icon="clock">{supplier.schedule.replace(/_/g, " ")}</s-badge>
+            <s-button
+              type="button"
+              variant="primary"
+              onClick={() => navigate(`/app/suppliers/${supplier.id}/edit`)}
+            >
+              Edit supplier
+            </s-button>
             <s-text color="subdued">Code {supplier.code}</s-text>
           </s-stack>
           <StatGrid>

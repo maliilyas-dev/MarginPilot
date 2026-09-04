@@ -69,14 +69,11 @@ export default function Help() {
   const navigate = useNavigate();
   return (
     <s-page heading="Help &amp; docs">
-      <s-button
-        slot="primary-action"
-        type="button"
-        variant="primary"
-        onClick={() => navigate("/app/guide")}
-      >
-        Open the guide
-      </s-button>
+      <s-section>
+        <s-button type="button" variant="primary" onClick={() => navigate("/app/guide")}>
+          Open the guide
+        </s-button>
+      </s-section>
 
       <s-section heading="What MarginPilot is for">
         <s-stack direction="block" gap="base">

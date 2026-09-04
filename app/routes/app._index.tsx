@@ -58,14 +58,11 @@ export default function Home() {
 
   return (
     <s-page heading="MarginPilot">
-      <s-button
-        slot="primary-action"
-        type="button"
-        variant="primary"
-        onClick={() => navigate(data.primaryCta.href)}
-      >
-        {data.primaryCta.label}
-      </s-button>
+      <s-section>
+        <s-button type="button" variant="primary" onClick={() => navigate(data.primaryCta.href)}>
+          {data.primaryCta.label}
+        </s-button>
+      </s-section>
 
       {!data.onboardingComplete && (
         <s-banner tone="info" heading="Finish setup to run your first safe sync">
