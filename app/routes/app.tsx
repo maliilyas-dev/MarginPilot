@@ -27,6 +27,42 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
  * React Router's `submit()`, which goes over `fetch` — App Bridge patches
  * `fetch` to attach `Authorization: Bearer <sessionToken>`.
  */
+const FIELD_TAGS =
+  "s-text-field,s-select,s-number-field,s-password-field,s-text-area,s-email-field,s-url-field,s-money-field,s-search-field,s-date-field,s-checkbox,s-switch,s-choice-list,s-color-field";
+
+/**
+ * Polaris web-component form fields (`s-text-field`, `s-select`, …) don't
+ * reliably contribute their value to the native FormData a React Router form
+ * reads on submit. Mirror each named field into a hidden <input> right before
+ * submitting, then clean them up.
+ */
+function mirrorPolarisFields(form: HTMLFormElement): HTMLInputElement[] {
+  const mirrors: HTMLInputElement[] = [];
+  form.querySelectorAll<HTMLElement>(FIELD_TAGS).forEach((el) => {
+    const name = el.getAttribute("name");
+    if (!name) return;
+    const tag = el.tagName.toLowerCase();
+    let value: string;
+    if (tag === "s-checkbox" || tag === "s-switch") {
+      const checked =
+        (el as unknown as { checked?: boolean }).checked ?? el.hasAttribute("checked");
+      if (!checked) return;
+      value = el.getAttribute("value") || "on";
+    } else {
+      const v = (el as unknown as { value?: unknown }).value;
+      value = v == null ? el.getAttribute("value") ?? "" : String(v);
+    }
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = name;
+    input.value = value;
+    input.dataset.polarisMirror = "1";
+    form.appendChild(input);
+    mirrors.push(input);
+  });
+  return mirrors;
+}
+
 function useSubmitButtonBridge() {
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
@@ -43,13 +79,11 @@ function useSubmitButtonBridge() {
           if (node.hasAttribute("disabled")) return;
           const form = node.closest("form");
           if (form && typeof form.requestSubmit === "function") {
-            // Stop the click's default (nothing happens for s-button anyway) and
-            // fire a real submit event so the form's own React Router / fetcher
-            // onSubmit handler runs — that path goes through App Bridge's patched
-            // fetch and attaches the session token. Do NOT stopPropagation:
-            // App Bridge needs to observe the event.
             event.preventDefault();
+            const mirrors = mirrorPolarisFields(form);
             form.requestSubmit();
+            // React Router has synchronously read the FormData by now.
+            setTimeout(() => mirrors.forEach((m) => m.remove()), 0);
           }
           return;
         }
