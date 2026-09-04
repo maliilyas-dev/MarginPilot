@@ -1,8 +1,38 @@
 # MarginPilot — Build Report
 
-**Build date:** 2026-09-03
+**Build date:** 2026-09-03 · **Last updated:** 2026-09-04
 **Base template:** `Shopify/shopify-app-template-react-router` (official, cloned on build date)
 **Stack:** React Router 7 + TypeScript · Prisma + PostgreSQL · Redis + BullMQ · decimal.js · csv-parse · Zod · Pino · Vitest
+**API version:** `2026-07` (latest stable; `2026-10` is a release candidate — not used, per spec rule 4)
+
+## Deployment status (live)
+
+| Piece | Value |
+|---|---|
+| Source | `github.com/maliilyas-dev/MarginPilot` (branch `main`) |
+| Hosting | Railway project `charming-optimism` — **web** + **worker** services + Postgres + Redis |
+| Web URL | `https://marginpilot-production.up.railway.app` (`/healthz` = ok) |
+| Shopify app | "MarginPilot", **AIDev Labs** Partner org, `client_id` `fbbaded3ccef01d48a75b86d52b5c1d8` |
+| Linked config | `shopify.app.margin-pilot.toml` (default); released version `marginpilot-2` (scopes + 5 webhooks incl. 3 compliance) |
+| Installed | owner's dev store `marginpilot-72x7tdi5.myshopify.com` |
+| Custom server | `server.js` (Express + `@react-router/express`) — forces `allowedActionOrigins` so the RR7 single-fetch CSRF guard doesn't 400 embedded action POSTs |
+
+### Embedded-form handling (important)
+
+Inside the Shopify admin iframe, only `fetch`-based submissions carry the App
+Bridge session token, and Polaris `s-*` fields don't populate native FormData.
+So: **every form uses `useFetcher().Form`** (or `fetcher.submit`), and a global
+delegate in `app/routes/app.tsx` (`useSubmitButtonBridge`) intercepts
+`s-button[type=submit]` clicks, mirrors each `s-*` field into a hidden `<input>`,
+and calls `form.requestSubmit()`.
+
+### Live progress + ETA
+
+`CatalogSync`, `FeedRun` and `ChangeSet` carry `progressPhase / progressDone /
+progressTotal` (+ `startedAt/finishedAt`). Processors update them as they work;
+`app/domain/progress.ts` does the ETA maths; `<JobProgress>` + `useLiveRefresh()`
+render an animated bar with "phase · N of M · X% · elapsed · ~ETA left" on
+Settings, Runs, and Run detail. Migration: `prisma/migrations/20260904120000_progress_fields`.
 
 ---
 
