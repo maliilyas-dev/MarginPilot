@@ -110,7 +110,17 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return cs;
   });
 
-  await enqueueChangesApply({ shopId: shop.id, changeSetId: changeSet.id });
+  try {
+    await enqueueChangesApply({ shopId: shop.id, changeSetId: changeSet.id });
+  } catch (err) {
+    // Don't leave the run stuck "applying" if the queue is unreachable.
+    await prisma.$transaction([
+      prisma.changeSet.update({ where: { id: changeSet.id }, data: { status: "pending" } }),
+      prisma.feedRun.update({ where: { id: run.id }, data: { status: "ready_for_review" } }),
+    ]);
+    console.error("[approve] enqueueChangesApply failed", err);
+    return backWithError("Could not queue the update job. Please try approving again in a moment.");
+  }
   await markOnboarding(shop.id, { changeSetReviewed: true });
   await recordAudit({
     shopId: shop.id,

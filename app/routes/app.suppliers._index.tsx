@@ -3,7 +3,7 @@ import { useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop } from "../services/shopContext.server";
-import { EmptyState, runStatusBadge, supplierStatusBadge } from "../components/ui";
+import { Callout, EmptyState, runStatusBadge, supplierStatusBadge } from "../components/ui";
 import prisma from "../db.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -50,6 +50,14 @@ export default function SuppliersIndex() {
       <s-button slot="primary-action" href="/app/suppliers/new" variant="primary">
         Add supplier
       </s-button>
+      {suppliers.length > 0 && (
+        <s-section>
+          <Callout tone="info" icon="store" title="One supplier per distributor or vendor">
+            Each supplier holds its own feed connection, saved column mapping and pricing rules. Open one to upload a feed
+            and see its match rate.
+          </Callout>
+        </s-section>
+      )}
       <s-section>
         {suppliers.length === 0 ? (
           <EmptyState

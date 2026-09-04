@@ -103,12 +103,25 @@ function useSubmitButtonBridge() {
   }, []);
 }
 
+const APP_STYLE = `
+  /* Gentle enter animation for page sections + a consistent progress-bar look. */
+  @media (prefers-reduced-motion: no-preference) {
+    s-section { animation: mp-fade-in .28s cubic-bezier(.4,0,.2,1) both; }
+    s-section:nth-of-type(2) { animation-delay: .04s; }
+    s-section:nth-of-type(3) { animation-delay: .08s; }
+    s-section:nth-of-type(4) { animation-delay: .12s; }
+  }
+  @keyframes mp-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  s-table-row { transition: background-color .12s ease; }
+`;
+
 export default function App() {
   const { apiKey } = useLoaderData<typeof loader>();
   useSubmitButtonBridge();
 
   return (
     <AppProvider embedded apiKey={apiKey}>
+      <style dangerouslySetInnerHTML={{ __html: APP_STYLE }} />
       <NavMenu>
         <a href="/app" rel="home">
           Home

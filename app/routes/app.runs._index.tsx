@@ -3,7 +3,7 @@ import { useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop } from "../services/shopContext.server";
-import { EmptyState, runStatusBadge, useLiveRefresh } from "../components/ui";
+import { Callout, EmptyState, runStatusBadge, useLiveRefresh } from "../components/ui";
 import { computeProgress } from "../domain/progress";
 import prisma from "../db.server";
 
@@ -55,6 +55,15 @@ export default function RunsIndex() {
   useLiveRefresh(runs.some((r) => r.active));
   return (
     <s-page heading="Runs">
+      {runs.length > 0 && (
+        <s-section>
+          <Callout tone="info" icon="clock-revert" title="Every feed you process shows up here">
+            A run moves through fetch → parse → validate → match → calculate, then waits at{" "}
+            <s-text type="strong">Ready for review</s-text>. Nothing is written to Shopify until you approve a run&apos;s
+            change set.
+          </Callout>
+        </s-section>
+      )}
       <s-section>
         {runs.length === 0 ? (
           <EmptyState
