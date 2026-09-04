@@ -4,6 +4,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop, requireFeedRun } from "../services/shopContext.server";
 import { JobProgress, StatCard, StatGrid, runStatusBadge, useLiveRefresh } from "../components/ui";
+import { formatDateTime } from "../utils/format";
 import prisma from "../db.server";
 
 const ACTIVE = ["queued", "fetching", "parsing", "validating", "mapping", "calculating", "applying"];
@@ -93,8 +94,8 @@ export default function RunDetail() {
             />
           ) : (
             <s-text color="subdued">
-              Started {new Date(run.at).toLocaleString()}
-              {run.completedAt ? ` · finished ${new Date(run.completedAt).toLocaleString()}` : ""}
+              Started {formatDateTime(run.at)}
+              {run.completedAt ? ` · finished ${formatDateTime(run.completedAt)}` : ""}
             </s-text>
           )}
           {run.errorSummary && <s-banner tone="critical">{run.errorSummary}</s-banner>}

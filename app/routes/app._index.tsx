@@ -12,6 +12,7 @@ import {
   TimeAgo,
   runStatusBadge,
 } from "../components/ui";
+import { formatDateTime, formatNumber } from "../utils/format";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -117,7 +118,7 @@ export default function Home() {
           />
           <StatCard
             label="Variants imported"
-            value={data.variantsImported.toLocaleString()}
+            value={formatNumber(data.variantsImported)}
             icon="product"
             tone="info"
             caption={data.lastCatalogSyncAt ? "From last catalog sync" : "Not synced yet"}
@@ -189,13 +190,15 @@ export default function Home() {
             <s-icon type="refresh" size="small" tone={data.lastCatalogSyncAt ? "success" : "auto"} />
             <s-text color="subdued">
               {data.lastCatalogSyncAt ? (
-                <>Last synced {new Date(data.lastCatalogSyncAt).toLocaleString()}</>
+                <>Last synced {formatDateTime(data.lastCatalogSyncAt)}</>
               ) : (
                 <>Catalog not synced yet</>
               )}
             </s-text>
           </s-stack>
-          <s-button href="/app/settings">Sync catalog in Settings</s-button>
+          <s-button type="button" onClick={() => navigate("/app/settings")}>
+            Sync catalog in Settings
+          </s-button>
         </s-stack>
       </s-section>
 

@@ -4,6 +4,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop } from "../services/shopContext.server";
 import { Callout, EmptyState, runStatusBadge, supplierStatusBadge } from "../components/ui";
+import { formatDate } from "../utils/format";
 import prisma from "../db.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -102,7 +103,7 @@ export default function SuppliersIndex() {
                   <s-table-cell>
                     {s.lastRunAt ? (
                       <s-stack direction="inline" gap="small-200" alignItems="center">
-                        <s-text color="subdued">{new Date(s.lastRunAt).toLocaleDateString()}</s-text>
+                        <s-text color="subdued">{formatDate(s.lastRunAt)}</s-text>
                         {s.lastRunStatus ? runStatusBadge(s.lastRunStatus) : null}
                       </s-stack>
                     ) : (

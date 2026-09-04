@@ -5,6 +5,7 @@ import { authenticate } from "../shopify.server";
 import { requireShop } from "../services/shopContext.server";
 import { Callout, EmptyState, runStatusBadge, useLiveRefresh } from "../components/ui";
 import { computeProgress } from "../domain/progress";
+import { formatDateTime } from "../utils/format";
 import prisma from "../db.server";
 
 const ACTIVE_STATUSES = ["queued", "fetching", "parsing", "validating", "mapping", "calculating", "applying"];
@@ -91,7 +92,7 @@ export default function RunsIndex() {
               {runs.map((r) => (
                 <s-table-row key={r.id}>
                   <s-table-cell>
-                    <s-text color="subdued">{new Date(r.at).toLocaleString()}</s-text>
+                    <s-text color="subdued">{formatDateTime(r.at)}</s-text>
                   </s-table-cell>
                   <s-table-cell>
                     <s-text type="strong">{r.supplier}</s-text>
@@ -114,13 +115,21 @@ export default function RunsIndex() {
                       {r.active ? (
                         <s-text color="subdued">
                           {(() => {
-                            const p = computeProgress({
-                              phase: r.progressPhase,
-                              done: r.progressDone,
-                              total: r.progressTotal,
-                              startedAt: r.startedAt,
-                              active: true,
-                            });
+                            const p = computeProgress(
+                              {
+                                phase: r.progressPhase,
+                                done: r.progressDone,
+                                total: r.progressTotal,
+                                startedAt: r.startedAt,
+                                active: true,
+                              },
+                              // Deterministic across server render + client hydration: anchor
+                              // "now" to startedAt (0s elapsed) instead of reading the wall
+                              // clock, which would render different text on each side and
+                              // trigger a React hydration mismatch. The next periodic
+                              // useLiveRefresh poll brings in real elapsed/ETA.
+                              r.startedAt ? new Date(r.startedAt).getTime() : undefined,
+                            );
                             return `${r.progressPhase ?? "Working"} · ${p.percent}%${p.etaLabel ? ` · ${p.etaLabel}` : ""}`;
                           })()}
                         </s-text>

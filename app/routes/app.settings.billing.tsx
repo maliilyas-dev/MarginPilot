@@ -5,6 +5,7 @@ import { authenticate } from "../shopify.server";
 import { requireShop } from "../services/shopContext.server";
 import { getEntitlement, PLAN_LIMITS } from "../services/entitlements.server";
 import { Callout, StatCard, StatGrid } from "../components/ui";
+import { formatNumber } from "../utils/format";
 import prisma from "../db.server";
 
 const PLAN_META: Record<string, { price: string; blurb: string }> = {
@@ -65,7 +66,7 @@ export default function Billing() {
             />
             <StatCard
               label="Mapped variants"
-              value={`${mappedCount.toLocaleString()} / ${ent.limits.maxMappedVariants.toLocaleString()}`}
+              value={`${formatNumber(mappedCount)} / ${formatNumber(ent.limits.maxMappedVariants)}`}
               icon="connect"
               tone={mappedPct >= 100 ? "critical" : mappedPct >= 80 ? "warning" : "info"}
             />
@@ -116,7 +117,7 @@ export default function Billing() {
                     <s-divider />
                     <s-stack direction="block" gap="small-300">
                       <s-text color="subdued">{l.maxSuppliers} supplier{l.maxSuppliers === 1 ? "" : "s"}</s-text>
-                      <s-text color="subdued">{l.maxMappedVariants.toLocaleString()} mapped variants</s-text>
+                      <s-text color="subdued">{formatNumber(l.maxMappedVariants)} mapped variants</s-text>
                       <s-text color="subdued">
                         {l.minScheduleIntervalMinutes === 0
                           ? "Manual runs only"

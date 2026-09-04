@@ -4,6 +4,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { requireShop } from "../services/shopContext.server";
 import { EmptyState, severityBadge } from "../components/ui";
+import { formatDateTime } from "../utils/format";
 import prisma from "../db.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -50,7 +51,7 @@ export default function Alerts() {
                     <s-badge tone={a.status === "resolved" ? "success" : a.status === "read" ? "neutral" : "info"}>
                       {a.status}
                     </s-badge>
-                    <s-text color="subdued">{new Date(a.at).toLocaleString()}</s-text>
+                    <s-text color="subdued">{formatDateTime(a.at)}</s-text>
                   </s-stack>
                   <s-heading>{a.title}</s-heading>
                   <s-text color="subdued">{a.message}</s-text>

@@ -5,10 +5,11 @@
  * visually native to Shopify admin, works in the App Bridge iframe, and meets
  * Built for Shopify UI expectations. No custom CSS framework.
  */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { ComponentProps, ReactNode } from "react";
-import { useRevalidator } from "react-router";
+import { useNavigate, useRevalidator } from "react-router";
 import { computeProgress } from "../domain/progress";
+import { formatDateTime } from "../utils/format";
 
 type Tone = "auto" | "neutral" | "info" | "success" | "caution" | "warning" | "critical";
 type IconName = NonNullable<ComponentProps<"s-icon">["type"]>;
@@ -72,6 +73,7 @@ export function EmptyState({
   children?: ReactNode;
   action?: { label: string; href: string };
 }) {
+  const navigate = useNavigate();
   return (
     <s-box padding="large-500" borderRadius="base">
       <s-stack direction="block" gap="base" alignItems="center">
@@ -85,7 +87,7 @@ export function EmptyState({
           </div>
         ) : null}
         {action ? (
-          <s-button href={action.href} variant="primary">
+          <s-button type="button" variant="primary" onClick={() => navigate(action.href)}>
             {action.label}
           </s-button>
         ) : null}
@@ -165,7 +167,7 @@ export function supplierStatusBadge(status: string) {
 
 export function TimeAgo({ iso }: { iso: string | null }) {
   if (!iso) return <s-text color="subdued">—</s-text>;
-  return <s-text color="subdued">{new Date(iso).toLocaleString()}</s-text>;
+  return <s-text color="subdued">{formatDateTime(iso)}</s-text>;
 }
 
 /** A tinted callout box for tips, safety notes and context. */
@@ -309,7 +311,21 @@ export function JobProgress({
   note = null,
   tone = "info",
 }: JobProgressProps) {
-  const p = computeProgress({ phase, done, total, startedAt, finishedAt, active });
+  // Elapsed/ETA depend on "now". Reading Date.now() during render would make
+  // the server-rendered HTML and the client's first hydration pass disagree
+  // (a fatal React hydration mismatch), so the first paint stays anchored at
+  // startedAt (0s elapsed) on both sides, then a post-mount effect starts a
+  // live-ticking clock — matching how this content is safe to update only
+  // after hydration completes.
+  const [liveNow, setLiveNow] = useState<number | null>(null);
+  useEffect(() => {
+    if (!active) return;
+    setLiveNow(Date.now());
+    const id = setInterval(() => setLiveNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [active]);
+  const restingNow = startedAt ? new Date(startedAt).getTime() : 0;
+  const p = computeProgress({ phase, done, total, startedAt, finishedAt, active }, liveNow ?? restingNow);
   const barColor =
     tone === "critical"
       ? "var(--s-color-bg-fill-critical, #d72c0d)"

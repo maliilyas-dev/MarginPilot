@@ -4,6 +4,7 @@
  * Used for the Matrixify-style "Reading products · 120 of 300 · ~1m 40s left"
  * readouts on catalog sync, feed runs and change apply.
  */
+import { formatNumber } from "../utils/format";
 
 export interface ProgressInput {
   phase: string | null;
@@ -74,6 +75,6 @@ export function computeProgress(input: ProgressInput, now: number = Date.now()):
     etaMs,
     elapsedLabel: formatDuration(elapsedMs),
     etaLabel: etaMs === null ? null : `~${formatDuration(etaMs)} left`,
-    countLabel: total > 0 ? `${done.toLocaleString()} of ${total.toLocaleString()}` : done.toLocaleString(),
+    countLabel: total > 0 ? `${formatNumber(done)} of ${formatNumber(total)}` : formatNumber(done),
   };
 }

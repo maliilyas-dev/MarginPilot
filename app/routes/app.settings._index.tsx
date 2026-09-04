@@ -9,6 +9,7 @@ import { requireShop, markOnboarding } from "../services/shopContext.server";
 import { recordAudit } from "../services/audit.server";
 import { requestCatalogSync } from "../services/catalogSyncRequest.server";
 import { Callout, JobProgress, StatCard, StatGrid, useLiveRefresh } from "../components/ui";
+import { formatDateTime, formatNumber } from "../utils/format";
 import prisma from "../db.server";
 
 const schema = z.object({
@@ -163,7 +164,7 @@ export default function Settings() {
           </Callout>
 
           <StatGrid>
-            <StatCard label="Active variants imported" value={variantCount.toLocaleString()} icon="product" tone="info" />
+            <StatCard label="Active variants imported" value={formatNumber(variantCount)} icon="product" tone="info" />
             <StatCard
               label="Last sync"
               value={lastSync ? lastSync.status : "Never"}
@@ -175,7 +176,7 @@ export default function Settings() {
                     ? "critical"
                     : "neutral"
               }
-              caption={lastSync ? new Date(lastSync.at).toLocaleString() : "Run a sync to get started"}
+              caption={lastSync ? formatDateTime(lastSync.at) : "Run a sync to get started"}
             />
           </StatGrid>
 

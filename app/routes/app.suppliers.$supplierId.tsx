@@ -7,6 +7,7 @@ import { requireShop, requireSupplier } from "../services/shopContext.server";
 import { ALL_FIELDS, FIELD_LABELS, REQUIRED_FIELDS, type CanonicalField, type ColumnMappings } from "../domain/feeds/canonicalFields";
 import { Callout, StatCard, StatGrid, runStatusBadge, supplierStatusBadge } from "../components/ui";
 import { readFields } from "../components/domForm";
+import { formatDateTime } from "../utils/format";
 import prisma from "../db.server";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -290,7 +291,7 @@ export default function SupplierDetail() {
               {runs.map((r) => (
                 <s-table-row key={r.id}>
                   <s-table-cell>
-                    <s-text color="subdued">{new Date(r.at).toLocaleString()}</s-text>
+                    <s-text color="subdued">{formatDateTime(r.at)}</s-text>
                   </s-table-cell>
                   <s-table-cell>{r.trigger.replace(/_/g, " ")}</s-table-cell>
                   <s-table-cell>{runStatusBadge(r.status)}</s-table-cell>

@@ -8,6 +8,7 @@ import { recordAudit } from "../services/audit.server";
 import { describeReason, type ReasonCodeValue } from "../domain/safety/reasonCodes";
 import { Callout, StatCard, StatGrid, classificationBadge, useLiveRefresh } from "../components/ui";
 import { readFields } from "../components/domForm";
+import { formatMoney } from "../utils/format";
 import prisma from "../db.server";
 
 const FILTERS = ["all", "safe", "warning", "blocked", "unmatched", "invalid", "unchanged"] as const;
@@ -210,7 +211,7 @@ export default function Review() {
         <s-stack direction="block" gap="small-200">
           <span style={{ fontSize: "1.6rem", fontWeight: 650, letterSpacing: "-0.01em" }}>
             {data.exposure.priceDelta >= 0 ? "+" : "−"}
-            {Math.abs(data.exposure.priceDelta).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            {formatMoney(Math.abs(data.exposure.priceDelta))}
           </span>
           <s-text color="subdued">
             Total selling-price change across {data.exposure.affectedVariants} safe variant(s) if you approve all safe
