@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Form, redirect, useActionData, useLoaderData } from "react-router";
+import { redirect, useFetcher, useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { z } from "zod";
 import { authenticate } from "../shopify.server";
@@ -76,7 +76,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
 export default function EditSupplier() {
   const { supplier } = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
+  const fetcher = useFetcher<typeof action>();
+  const actionData = fetcher.data;
   return (
     <s-page heading={`Edit ${supplier.name}`}>
       <s-button slot="primary-action" href={`/app/suppliers/${supplier.id}`} variant="tertiary">
@@ -87,7 +88,7 @@ export default function EditSupplier() {
           <s-banner tone="critical">{actionData.error}</s-banner>
         </s-section>
       )}
-      <Form method="post">
+      <fetcher.Form method="post">
         <s-section heading="Identity">
           <s-stack direction="block" gap="base">
             <s-text-field label="Supplier name" name="name" defaultValue={supplier.name} required />
@@ -159,7 +160,7 @@ export default function EditSupplier() {
             </s-button>
           </s-stack>
         </s-section>
-      </Form>
+      </fetcher.Form>
 
       <s-section slot="aside" heading="Good to know">
         <s-stack direction="block" gap="small-300">

@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Form, useFetcher, useLoaderData } from "react-router";
+import { useFetcher, useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { z } from "zod";
 import { authenticate } from "../shopify.server";
@@ -116,6 +116,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function Settings() {
   const { shop, locations, safety, lastSync, variantCount } = useLoaderData<typeof loader>();
   const sync = useFetcher<{ ok: boolean; catalogSyncId?: string; alreadyRunning?: boolean; message?: string }>();
+  const save = useFetcher<{ ok?: boolean; error?: string }>();
   const syncActive = Boolean(lastSync?.active) || sync.state !== "idle";
   useLiveRefresh(syncActive);
 
@@ -183,7 +184,7 @@ export default function Settings() {
       </s-section>
 
       <s-section heading="Default inventory location">
-        <Form method="post">
+        <save.Form method="post">
           <input type="hidden" name="intent" value="location" />
           <s-stack direction="block" gap="base">
             <s-select
@@ -206,7 +207,7 @@ export default function Settings() {
               Save location
             </s-button>
           </s-stack>
-        </Form>
+        </save.Form>
       </s-section>
 
       <s-section heading="Safety policy">
@@ -214,7 +215,7 @@ export default function Settings() {
           A row that exceeds any limit is marked <s-text type="strong">blocked</s-text> and cannot be applied until you
           fix the data or override that single row. Run-level limits can stop a whole feed.
         </Callout>
-        <Form method="post">
+        <save.Form method="post">
           <input type="hidden" name="intent" value="safety" />
           <s-stack direction="block" gap="base">
             <s-text color="subdued">Per-row limits — a row past any of these is blocked.</s-text>
@@ -267,7 +268,7 @@ export default function Settings() {
               Save safety policy
             </s-button>
           </s-stack>
-        </Form>
+        </save.Form>
       </s-section>
 
       <s-section slot="aside" heading="Billing">

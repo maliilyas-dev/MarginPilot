@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Form, useActionData, useLoaderData } from "react-router";
+import { useFetcher, useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { z } from "zod";
 import { authenticate } from "../shopify.server";
@@ -91,7 +91,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export default function Rules() {
   const { rules, suppliers } = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
+  const create = useFetcher<typeof action>();
+  const del = useFetcher<typeof action>();
+  const actionData = create.data ?? del.data;
 
   return (
     <s-page heading="Pricing rules">
@@ -136,13 +138,14 @@ export default function Rules() {
                   <s-table-cell>{r.markupPercent}%</s-table-cell>
                   <s-table-cell>{r.roundingRule.replace(/_/g, " ")}</s-table-cell>
                   <s-table-cell>
-                    <Form method="post">
-                      <input type="hidden" name="intent" value="delete" />
-                      <input type="hidden" name="id" value={r.id} />
-                      <s-button type="submit" variant="tertiary">
-                        Delete
-                      </s-button>
-                    </Form>
+                    <s-button
+                      type="button"
+                      variant="tertiary"
+                      onClick={() => del.submit({ intent: "delete", id: r.id }, { method: "post" })}
+                      {...(del.state !== "idle" ? { loading: true } : {})}
+                    >
+                      Delete
+                    </s-button>
                   </s-table-cell>
                 </s-table-row>
               ))}
@@ -151,7 +154,7 @@ export default function Rules() {
         )}
       </s-section>
 
-      <Form method="post">
+      <create.Form method="post">
         <input type="hidden" name="intent" value="create" />
 
         <s-section heading="New rule — scope">
@@ -262,7 +265,7 @@ export default function Rules() {
             </s-button>
           </s-stack>
         </s-section>
-      </Form>
+      </create.Form>
 
       <s-section slot="aside" heading="Worked example">
         <s-box padding="base" borderRadius="base" background="subdued">

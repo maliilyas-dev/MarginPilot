@@ -1,5 +1,6 @@
+import { useState } from "react";
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Form, useLoaderData, useSearchParams } from "react-router";
+import { useFetcher, useLoaderData, useSearchParams } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { z } from "zod";
 import { authenticate } from "../shopify.server";
@@ -216,29 +217,12 @@ export default function Mappings() {
                     </s-badge>
                   </s-table-cell>
                   <s-table-cell>
-                    <Form method="post">
-                      <input type="hidden" name="supplierId" value={m.supplierId} />
-                      <input type="hidden" name="mappingId" value={m.id} />
-                      <s-stack direction="inline" gap="small-300">
-                        <select name="variantId" defaultValue="">
-                          <option value="">Pick variant…</option>
-                          {data.candidateVariants.map((v) => (
-                            <option key={v.id} value={v.id}>
-                              {v.label}
-                            </option>
-                          ))}
-                        </select>
-                        <button type="submit" name="intent" value="map">
-                          Map
-                        </button>
-                        <button type="submit" name="intent" value="unmap">
-                          Unmap
-                        </button>
-                        <button type="submit" name="intent" value="ignore">
-                          Ignore
-                        </button>
-                      </s-stack>
-                    </Form>
+                    <MappingActions
+                      supplierId={m.supplierId}
+                      mappingId={m.id}
+                      status={m.status}
+                      candidates={data.candidateVariants}
+                    />
                   </s-table-cell>
                 </s-table-row>
               ))}
@@ -260,6 +244,68 @@ export default function Mappings() {
         )}
       </s-section>
     </s-page>
+  );
+}
+
+function MappingActions({
+  supplierId,
+  mappingId,
+  status,
+  candidates,
+}: {
+  supplierId: string;
+  mappingId: string;
+  status: string;
+  candidates: Array<{ id: string; label: string }>;
+}) {
+  const fetcher = useFetcher<{ ok?: boolean; error?: string }>();
+  const [variantId, setVariantId] = useState("");
+  const busy = fetcher.state !== "idle";
+
+  const send = (intent: "map" | "unmap" | "ignore") => {
+    const payload: Record<string, string> = { intent, supplierId, mappingId };
+    if (intent === "map") payload.variantId = variantId;
+    fetcher.submit(payload, { method: "post", action: "/app/mappings" });
+  };
+
+  return (
+    <s-stack direction="block" gap="small-300">
+      <s-stack direction="inline" gap="small-200" alignItems="center">
+        <s-select
+          label="Variant"
+          value={variantId}
+          onChange={(e) => setVariantId((e.target as HTMLSelectElement).value)}
+        >
+          <s-option value="">Pick variant…</s-option>
+          {candidates.map((v) => (
+            <s-option key={v.id} value={v.id}>
+              {v.label}
+            </s-option>
+          ))}
+        </s-select>
+        <s-button
+          type="button"
+          variant="primary"
+          onClick={() => send("map")}
+          {...(busy || !variantId ? { disabled: true } : {})}
+        >
+          Map
+        </s-button>
+      </s-stack>
+      <s-stack direction="inline" gap="small-200">
+        {status !== "unmatched" && (
+          <s-button type="button" variant="tertiary" onClick={() => send("unmap")} {...(busy ? { disabled: true } : {})}>
+            Unmap
+          </s-button>
+        )}
+        {status !== "ignored" && (
+          <s-button type="button" variant="tertiary" onClick={() => send("ignore")} {...(busy ? { disabled: true } : {})}>
+            Ignore
+          </s-button>
+        )}
+      </s-stack>
+      {fetcher.data?.error ? <s-text tone="critical">{fetcher.data.error}</s-text> : null}
+    </s-stack>
   );
 }
 
